@@ -26,7 +26,7 @@ export default function UsersPage() {
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, total_pages: 1 });
   const [search, setSearch] = useState('');
   const [sekolahs, setSekolahs] = useState<Sekolah[]>([]);
-  
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<UserItem | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -78,44 +78,52 @@ export default function UsersPage() {
   };
 
   const columns = [
-    { header: 'Username', render: (u: UserItem) => (
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
-          <UserCog className="w-3.5 h-3.5 text-primary" />
+    {
+      header: 'Username', render: (u: UserItem) => (
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
+            <UserCog className="w-3.5 h-3.5 text-primary" />
+          </div>
+          <span className="font-bold text-foreground">{u.username}</span>
         </div>
-        <span className="font-bold text-foreground">{u.username}</span>
-      </div>
-    )},
-    { header: 'Role', render: (u: UserItem) => {
-      const meta = roleMeta[u.role] || roleMeta.siswa;
-      return (
-        <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-white/5 ${meta.bg}`}>
-          <meta.icon className={`w-3 h-3 ${meta.color}`} />
-          <span className={`text-[10px] font-black uppercase tracking-wider ${meta.color}`}>{u.role}</span>
+      )
+    },
+    {
+      header: 'Role', render: (u: UserItem) => {
+        const meta = roleMeta[u.role] || roleMeta.siswa;
+        return (
+          <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-white/5 ${meta.bg}`}>
+            <meta.icon className={`w-3 h-3 ${meta.color}`} />
+            <span className={`text-[10px] font-black uppercase tracking-wider ${meta.color}`}>{u.role}</span>
+          </div>
+        );
+      }
+    },
+    {
+      header: 'Sekolah', render: (u: UserItem) => (
+        <span className="text-xs font-medium text-muted-foreground">{u.nama_sekolah || (u.role === 'superadmin' ? 'Global Access' : '-')}</span>
+      )
+    },
+    {
+      header: 'Aksi', align: 'right' as const, render: (u: UserItem) => (
+        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10" onClick={() => openEdit(u)}>
+            <Edit2 className="w-3.5 h-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => handleDelete(u.id)}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
         </div>
-      );
-    }},
-    { header: 'Sekolah', render: (u: UserItem) => (
-      <span className="text-xs font-medium text-muted-foreground">{u.nama_sekolah || (u.role === 'superadmin' ? 'Global Access' : '-')}</span>
-    )},
-    { header: 'Aksi', align: 'right' as const, render: (u: UserItem) => (
-      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10" onClick={() => openEdit(u)}>
-          <Edit2 className="w-3.5 h-3.5" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => handleDelete(u.id)}>
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
-      </div>
-    )}
+      )
+    }
   ];
 
-  const filteredRoles = actor?.role === 'superadmin' 
-    ? ['superadmin', 'admin'] 
+  const filteredRoles = actor?.role === 'superadmin'
+    ? ['superadmin', 'admin']
     : ['admin', 'guru', 'siswa', 'orang_tua'];
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="w-full p-6 space-y-6 mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
@@ -161,7 +169,7 @@ export default function UsersPage() {
             <div className="space-y-4">
               <FormField id="username" label="Username" value={form.username} onChange={v => setForm(f => ({ ...f, username: v }))} required />
               <FormField id="password" label={editTarget ? "Password Baru (Kosongkan jika tidak ganti)" : "Password"} type="password" value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} required={!editTarget} />
-              
+
               <FormField id="role" label="Hak Akses / Role" type="select" value={form.role} onChange={v => setForm(f => ({ ...f, role: v }))}
                 options={filteredRoles.map(r => ({ value: r, label: r.toUpperCase() }))} required />
 

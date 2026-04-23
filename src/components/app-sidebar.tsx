@@ -72,8 +72,10 @@ const ADMIN_ITEMS: MenuItem[] = [
 ]
 
 const ADMIN_SYSTEM: MenuItem[] = [
-  { title: 'Data Pengguna', url: '/users',    icon: UserCog },
-  { title: 'Pengaturan',   url: '/settings', icon: Settings },
+  { title: 'Tahun Ajaran',   url: '/tahun-ajaran', icon: CalendarDays },
+  { title: 'Semester',       url: '/semester',     icon: Layers },
+  { title: 'Data Pengguna',  url: '/users',        icon: UserCog },
+  { title: 'Pengaturan',     url: '/settings',     icon: Settings },
 ]
 
 const GURU_ITEMS: MenuItem[] = [

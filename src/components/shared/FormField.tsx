@@ -9,11 +9,12 @@ interface FormFieldProps {
   value: any;
   onChange: (value: any) => void;
   required?: boolean;
+  disabled?: boolean;
   className?: string;
   options?: { value: string | number; label: string }[];
 }
 
-const inputCls = "h-10 bg-white/5 border-white/10 focus:border-primary/40 text-sm placeholder:text-muted-foreground/40 transition-colors";
+const inputCls = "h-10 bg-white/5 border-white/10 focus:border-primary/40 text-sm placeholder:text-muted-foreground/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
 export function FormField({
   id,
@@ -23,6 +24,7 @@ export function FormField({
   value,
   onChange,
   required = false,
+  disabled = false,
   className = '',
   options
 }: FormFieldProps) {
@@ -37,6 +39,7 @@ export function FormField({
           id={id}
           value={value}
           onChange={e => onChange(e.target.value)}
+          disabled={disabled}
           className={`w-full ${inputCls} rounded-md border px-3 text-foreground focus:outline-none`}
         >
           {placeholder && <option value="">{placeholder}</option>}
@@ -53,6 +56,7 @@ export function FormField({
           placeholder={placeholder}
           value={value}
           onChange={e => onChange(e.target.value)}
+          disabled={disabled}
           className={inputCls}
         />
       )}
