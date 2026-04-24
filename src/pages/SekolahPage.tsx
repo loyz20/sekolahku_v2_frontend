@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
-import { Building2, AlertTriangle, Plus, Edit2, Trash2, Hash, MapPin } from 'lucide-react';
+import { Building2, AlertTriangle, Plus, Edit2, Trash2, Hash, MapPin, ShieldCheck, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/shared/DataTable';
 import { Modal } from '@/components/shared/Modal';
@@ -40,6 +40,8 @@ export default function SekolahPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [adminCredentials, setAdminCredentials] = useState<{ username: string; password: string; warning?: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
@@ -63,10 +65,35 @@ export default function SekolahPage() {
     if (!form.nama || !form.npsn) { setFormError('Nama dan NPSN wajib diisi.'); return; }
     setSaving(true); setFormError('');
     try {
-      if (editTarget) await api.put(`/sekolah/${editTarget.id}`, form);
-      else await api.post('/sekolah', form);
+      if (editTarget) {
+        await api.put(`/sekolah/${editTarget.id}`, form);
+      } else {
+        const res = await api.post<any>('/sekolah', form);
+        const data = res.data;
+        if (data.admin_user) {
+          setAdminCredentials({
+            username: data.admin_user.username,
+            password: data.admin_user.default_password,
+          });
+        } else if (data.admin_warning) {
+          setAdminCredentials({
+            username: '',
+            password: '',
+            warning: data.admin_warning,
+          });
+        }
+      }
       setModalOpen(false); fetchData(pagination.page);
     } catch (e: any) { setFormError(e.message || 'Terjadi kesalahan.'); } finally { setSaving(false); }
+  };
+
+  const copyCredentials = () => {
+    if (!adminCredentials) return;
+    const text = `Username: ${adminCredentials.username}\nPassword: ${adminCredentials.password}`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   const handleDelete = async () => {
@@ -170,13 +197,17 @@ export default function SekolahPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-primary/60">Identitas</p>
                 <FormField id="nama" label="Nama Sekolah" value={form.nama} onChange={v => setForm(f => ({ ...f, nama: v }))} required />
                 <FormField id="npsn" label="NPSN" value={form.npsn} onChange={v => setForm(f => ({ ...f, npsn: v }))} required />
-                <FormField id="status" label="Status Sekolah" type="select" value={form.status} onChange={v => setForm(f => ({ ...f, status: v }))}
-                  options={[{ value: 'Negeri', label: 'Negeri' }, { value: 'Swasta', label: 'Swasta' }]} />
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField id="status" label="Status" type="select" value={form.status} onChange={v => setForm(f => ({ ...f, status: v }))}
+                    options={[{ value: 'Negeri', label: 'Negeri' }, { value: 'Swasta', label: 'Swasta' }]} />
+                  <FormField id="kode_pos" label="Kode Pos" value={form.kode_pos} onChange={v => setForm(f => ({ ...f, kode_pos: v }))} />
+                </div>
               </div>
               <div className="space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-primary/60">Lokasi</p>
@@ -189,6 +220,14 @@ export default function SekolahPage() {
                   <FormField id="kecamatan" label="Kecamatan" value={form.kecamatan} onChange={v => setForm(f => ({ ...f, kecamatan: v }))} />
                   <FormField id="desa" label="Desa" value={form.desa} onChange={v => setForm(f => ({ ...f, desa: v }))} />
                 </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/5 pt-5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary/60 mb-4">Koordinat</p>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField id="lintang" label="Lintang (Latitude)" type="number" value={String(form.lintang)} onChange={v => setForm(f => ({ ...f, lintang: Number(v) }))} />
+                <FormField id="bujur" label="Bujur (Longitude)" type="number" value={String(form.bujur)} onChange={v => setForm(f => ({ ...f, bujur: Number(v) }))} />
               </div>
             </div>
           </div>
@@ -212,6 +251,55 @@ export default function SekolahPage() {
             <p className="text-sm text-muted-foreground">
               Data <span className="font-semibold text-foreground">{deleteTarget.nama}</span> akan dihapus permanen.
             </p>
+          </div>
+        </Modal>
+      )}
+
+      {adminCredentials && (
+        <Modal
+          title="Admin Sekolah Berhasil Dibuat"
+          icon={<ShieldCheck className="w-5 h-5" />}
+          onClose={() => { setAdminCredentials(null); setCopied(false); }}
+          onSubmit={() => { setAdminCredentials(null); setCopied(false); }}
+          submitLabel="Tutup"
+          maxWidth="sm"
+        >
+          <div className="space-y-4">
+            {adminCredentials.warning ? (
+              <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/25 text-amber-400 text-sm">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{adminCredentials.warning}</span>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Akun admin untuk sekolah ini telah dibuat secara otomatis. Simpan kredensial berikut:
+                </p>
+                <div className="rounded-xl bg-black/30 border border-white/10 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Username</p>
+                      <p className="text-sm font-mono font-bold text-sky-400">{adminCredentials.username}</p>
+                    </div>
+                  </div>
+                  <div className="border-t border-white/5" />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Password</p>
+                      <p className="text-sm font-mono font-bold text-emerald-400">{adminCredentials.password}</p>
+                    </div>
+                  </div>
+                </div>
+                <Button variant="outline" className="w-full gap-2" onClick={copyCredentials}>
+                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Tersalin!' : 'Salin Kredensial'}
+                </Button>
+                <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/25 text-amber-400 text-xs">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>Pastikan admin sekolah segera mengganti password default setelah login pertama kali.</span>
+                </div>
+              </>
+            )}
           </div>
         </Modal>
       )}

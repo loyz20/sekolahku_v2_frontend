@@ -13,7 +13,7 @@ interface Siswa {
   nis: string;
   nisn: string;
   nik: string;
-  jenis_kelamin: 'L' | 'P';
+  jenis_kelamin: 'L' | 'P' | '';
   tanggal_lahir: string;
   nama_ayah: string;
   nama_ibu: string;
@@ -24,7 +24,7 @@ interface Siswa {
 
 const EMPTY_FORM = {
   nama: '', nis: '', nisn: '', nik: '',
-  jenis_kelamin: 'L' as 'L' | 'P',
+  jenis_kelamin: '' as 'L' | 'P' | '',
   tanggal_lahir: '',
   nama_ayah: '', nama_ibu: '',
   rombel_id: ''
@@ -68,7 +68,7 @@ export default function SiswaPage() {
       nis: s.nis || '',
       nisn: s.nisn || '',
       nik: s.nik || '',
-      jenis_kelamin: s.jenis_kelamin,
+      jenis_kelamin: s.jenis_kelamin || '',
       tanggal_lahir: s.tanggal_lahir?.slice(0, 10) || '',
       nama_ayah: s.nama_ayah || '',
       nama_ibu: s.nama_ibu || '',
@@ -195,12 +195,12 @@ export default function SiswaPage() {
                 <FormField id="nama" label="Nama Lengkap" value={form.nama} onChange={v => setForm(f => ({ ...f, nama: v }))} required />
                 <div className="grid grid-cols-2 gap-3">
                   <FormField id="nis" label="NIS" value={form.nis} onChange={v => setForm(f => ({ ...f, nis: v }))} required />
-                  <FormField id="nisn" label="NISN" value={form.nisn} onChange={v => setForm(f => ({ ...f, nisn: v }))} />
+                  <FormField id="nisn" label="NISN (Optional)" value={form.nisn} onChange={v => setForm(f => ({ ...f, nisn: v }))} />
                 </div>
-                <FormField id="nik" label="NIK" value={form.nik} onChange={v => setForm(f => ({ ...f, nik: v }))} />
+                <FormField id="nik" label="NIK (Optional)" value={form.nik} onChange={v => setForm(f => ({ ...f, nik: v }))} />
                 <div className="grid grid-cols-2 gap-3">
-                  <FormField id="jk" label="Jenis Kelamin" type="select" value={form.jenis_kelamin} onChange={v => setForm(f => ({ ...f, jenis_kelamin: v }))}
-                    options={[{ value: 'L', label: 'Laki-laki' }, { value: 'P', label: 'Perempuan' }]} />
+                  <FormField id="jk" label="Jenis Kelamin" type="select" value={form.jenis_kelamin} onChange={v => setForm(f => ({ ...f, jenis_kelamin: v as 'L' | 'P' | '' }))}
+                    options={[{ value: '', label: '-- Pilih --' }, { value: 'L', label: 'Laki-laki' }, { value: 'P', label: 'Perempuan' }]} />
                   <FormField id="tgl" label="Tgl Lahir" type="date" value={form.tanggal_lahir} onChange={v => setForm(f => ({ ...f, tanggal_lahir: v }))} />
                 </div>
               </div>

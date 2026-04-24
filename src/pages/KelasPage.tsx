@@ -7,7 +7,7 @@ import { Modal } from '@/components/shared/Modal';
 import { FormField } from '@/components/shared/FormField';
 
 interface PTK { id: string; nama: string; }
-interface TahunAjaran { id: string; nama: string; is_aktif: number; }
+interface TahunAjaran { id: string; tahun: string; aktif: number; }
 interface Rombel {
   id: string;
   sekolah_id: string;
@@ -16,6 +16,7 @@ interface Rombel {
   tingkat: number;
   wali_kelas_ptk_id?: string;
   wali_kelas_nama?: string;
+  tahun_ajaran_nama?: string;
 }
 
 const EMPTY_FORM = {
@@ -58,14 +59,14 @@ export default function KelasPage() {
     api.get<any>('/tahun-ajaran').then(res => {
       const items = res.data.items || res.data || [];
       setTahunAjarans(items);
-      const active = items.find((t: any) => t.is_aktif);
+      const active = items.find((t: any) => t.aktif);
       if (active) setForm(f => ({ ...f, tahun_ajaran_id: active.id }));
     }).catch(console.error);
   }, []);
 
   const openAdd = () => {
     setEditTarget(null);
-    const active = tahunAjarans.find(t => t.is_aktif);
+    const active = tahunAjarans.find(t => t.aktif);
     setForm({ ...EMPTY_FORM, tahun_ajaran_id: active?.id || '' });
     setFormError('');
     setModalOpen(true);
@@ -116,7 +117,7 @@ export default function KelasPage() {
     },
     {
       header: 'Tahun Ajaran', render: (r: Rombel) => (
-        <span className="text-xs font-medium text-muted-foreground">{tahunAjarans.find(t => t.id === r.tahun_ajaran_id)?.nama || '-'}</span>
+        <span className="text-xs font-medium text-muted-foreground">{r.tahun_ajaran_nama || tahunAjarans.find(t => t.id === r.tahun_ajaran_id)?.tahun || '-'}</span>
       )
     },
     {
@@ -183,7 +184,7 @@ export default function KelasPage() {
                 options={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(t => ({ value: t, label: `Tingkat ${t}` }))} required />
 
               <FormField id="tahun_ajaran_id" label="Tahun Ajaran" type="select" placeholder="-- Pilih Tahun Ajaran --" value={form.tahun_ajaran_id} onChange={v => setForm(f => ({ ...f, tahun_ajaran_id: v }))}
-                options={tahunAjarans.map(t => ({ value: t.id, label: t.nama + (t.is_aktif ? ' (Aktif)' : '') }))} required />
+                options={tahunAjarans.map(t => ({ value: t.id, label: t.tahun + (t.aktif ? ' (Aktif)' : '') }))} required />
 
               <FormField id="wali_kelas_ptk_id" label="Wali Kelas" type="select" placeholder="-- Pilih Wali Kelas --" value={form.wali_kelas_ptk_id} onChange={v => setForm(f => ({ ...f, wali_kelas_ptk_id: v }))}
                 options={ptks.map(p => ({ value: p.id, label: p.nama }))} />

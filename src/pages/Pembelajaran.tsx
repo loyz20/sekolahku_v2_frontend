@@ -27,14 +27,14 @@ const EMPTY_FORM = {
   jam_per_minggu: 1
 };
 
-export default function JadwalPage() {
+export default function PembelajaranPage() {
   const [items, setItems] = useState<Pembelajaran[]>([]);
   const [loading, setLoading] = useState(false);
   const [rombels, setRombels] = useState<Rombel[]>([]);
   const [mapels, setMapels] = useState<Mapel[]>([]);
   const [gurus, setGurus] = useState<Guru[]>([]);
   const [selectedRombel, setSelectedRombel] = useState('');
-  
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Pembelajaran | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -96,7 +96,7 @@ export default function JadwalPage() {
       setFormError('Lengkapi semua data yang diperlukan.');
       return;
     }
-    
+
     setSaving(true); setFormError('');
     try {
       if (editTarget) await api.put(`/pembelajaran/${editTarget.id}`, form);
@@ -111,38 +111,46 @@ export default function JadwalPage() {
   };
 
   const columns = [
-    { header: 'Mata Pelajaran', render: (p: Pembelajaran) => (
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center shrink-0">
-          <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+    {
+      header: 'Mata Pelajaran', render: (p: Pembelajaran) => (
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center shrink-0">
+            <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-bold text-foreground leading-tight">{p.mata_pelajaran_nama}</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-tight">{p.mata_pelajaran_kode}</span>
+          </div>
         </div>
-        <div className="flex flex-col">
-          <span className="font-bold text-foreground leading-tight">{p.mata_pelajaran_nama}</span>
-          <span className="text-[10px] text-muted-foreground uppercase tracking-tight">{p.mata_pelajaran_kode}</span>
+      )
+    },
+    {
+      header: 'Guru Pengampu', render: (p: Pembelajaran) => (
+        <div className="flex items-center gap-2 text-xs font-semibold text-sky-400">
+          <User className="w-3 h-3" />{p.ptk_nama}
         </div>
-      </div>
-    )},
-    { header: 'Guru Pengampu', render: (p: Pembelajaran) => (
-      <div className="flex items-center gap-2 text-xs font-semibold text-sky-400">
-        <User className="w-3 h-3" />{p.ptk_nama}
-      </div>
-    )},
-    { header: 'Beban Belajar', render: (p: Pembelajaran) => (
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <Clock className="w-3 h-3 opacity-40" />
-        {p.jam_per_minggu} JP / Minggu
-      </div>
-    )},
-    { header: 'Aksi', align: 'right' as const, render: (p: Pembelajaran) => (
-      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10" onClick={() => openEdit(p)}>
-          <Edit2 className="w-3.5 h-3.5" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => handleDelete(p.id)}>
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
-      </div>
-    )}
+      )
+    },
+    {
+      header: 'Beban Belajar', render: (p: Pembelajaran) => (
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <Clock className="w-3 h-3 opacity-40" />
+          {p.jam_per_minggu} JP / Minggu
+        </div>
+      )
+    },
+    {
+      header: 'Aksi', align: 'right' as const, render: (p: Pembelajaran) => (
+        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10" onClick={() => openEdit(p)}>
+            <Edit2 className="w-3.5 h-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => handleDelete(p.id)}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )
+    }
   ];
 
   return (
@@ -157,11 +165,11 @@ export default function JadwalPage() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">Atur pembagian mata pelajaran dan guru per rombel</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 min-w-[200px]">
             <Layers className="w-4 h-4 text-muted-foreground" />
-            <select 
+            <select
               className="bg-transparent border-none text-sm font-semibold focus:ring-0 w-full"
               value={selectedRombel}
               onChange={(e) => setSelectedRombel(e.target.value)}
@@ -203,13 +211,13 @@ export default function JadwalPage() {
             <div className="space-y-4">
               <FormField id="rombel" label="Rombongan Belajar" type="select" value={form.rombel_id} onChange={v => setForm(f => ({ ...f, rombel_id: v }))}
                 options={rombels.map(r => ({ value: r.id, label: r.nama }))} required disabled />
-              
+
               <FormField id="mapel" label="Mata Pelajaran" type="select" placeholder="-- Pilih Mapel --" value={form.mata_pelajaran_id} onChange={v => setForm(f => ({ ...f, mata_pelajaran_id: v }))}
                 options={mapels.map(m => ({ value: m.id, label: m.nama }))} required />
-              
+
               <FormField id="guru" label="Guru Pengampu" type="select" placeholder="-- Pilih Guru --" value={form.ptk_id} onChange={v => setForm(f => ({ ...f, ptk_id: v }))}
                 options={gurus.map(g => ({ value: g.id, label: g.nama }))} required />
-              
+
               <FormField id="jam" label="Jam Pelajaran per Minggu" type="number" value={String(form.jam_per_minggu)} onChange={v => setForm(f => ({ ...f, jam_per_minggu: parseInt(v) || 0 }))} required />
             </div>
           </div>

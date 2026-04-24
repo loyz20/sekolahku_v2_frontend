@@ -17,8 +17,9 @@ import TahunAjaranPage from '@/pages/TahunAjaranPage';
 import SemesterPage from '@/pages/SemesterPage';
 import GuruPage from '@/pages/GuruPage';
 import MapelPage from '@/pages/MapelPage';
-import JadwalPage from '@/pages/JadwalPage';
+import JadwalPage from '@/pages/Pembelajaran';
 import AbsensiPage from '@/pages/AbsensiPage';
+import PembelajaranPage from '@/pages/Pembelajaran';
 
 function App() {
   return (
@@ -44,7 +45,7 @@ function App() {
             <Route path="/siswa" element={<SiswaPage />} />
             <Route path="/guru" element={<GuruPage />} />
             <Route path="/mapel" element={<MapelPage />} />
-            <Route path="/jadwal" element={<JadwalPage />} />
+            <Route path="/pembelajaran" element={<PembelajaranPage />} />
             <Route path="/absensi" element={<AbsensiPage />} />
             <Route path="/kelas" element={<KelasPage />} />
             <Route path="/tahun-ajaran" element={<TahunAjaranPage />} />

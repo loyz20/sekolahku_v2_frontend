@@ -41,10 +41,10 @@ import {
 // ─── Role helpers ─────────────────────────────────────────────────────────────
 const ROLE_META: Record<string, { label: string; color: string; bg: string; initials: (r: string) => string }> = {
   superadmin: { label: 'Super Admin', color: 'text-amber-400', bg: 'bg-amber-500/15 border border-amber-500/25', initials: () => 'SA' },
-  admin:      { label: 'Admin Sekolah', color: 'text-emerald-400', bg: 'bg-emerald-500/15 border border-emerald-500/25', initials: () => 'AD' },
-  guru:       { label: 'Tenaga Pendidik', color: 'text-violet-400', bg: 'bg-violet-500/15 border border-violet-500/25', initials: () => 'GR' },
-  siswa:      { label: 'Peserta Didik', color: 'text-sky-400',     bg: 'bg-sky-500/15 border border-sky-500/25',       initials: () => 'SW' },
-  orang_tua:  { label: 'Orang Tua', color: 'text-pink-400',        bg: 'bg-pink-500/15 border border-pink-500/25',       initials: () => 'OT' },
+  admin: { label: 'Admin Sekolah', color: 'text-emerald-400', bg: 'bg-emerald-500/15 border border-emerald-500/25', initials: () => 'AD' },
+  guru: { label: 'Tenaga Pendidik', color: 'text-violet-400', bg: 'bg-violet-500/15 border border-violet-500/25', initials: () => 'GR' },
+  siswa: { label: 'Peserta Didik', color: 'text-sky-400', bg: 'bg-sky-500/15 border border-sky-500/25', initials: () => 'SW' },
+  orang_tua: { label: 'Orang Tua', color: 'text-pink-400', bg: 'bg-pink-500/15 border border-pink-500/25', initials: () => 'OT' },
 }
 
 function getRoleMeta(role: string) {
@@ -59,35 +59,35 @@ const COMMON: MenuItem[] = [
 ]
 
 const SUPERADMIN_ITEMS: MenuItem[] = [
-  { title: 'Data Sekolah',     url: '/sekolah', icon: Building2 },
+  { title: 'Data Sekolah', url: '/sekolah', icon: Building2 },
 ]
 
 const ADMIN_ITEMS: MenuItem[] = [
-  { title: 'Data Kelas',       url: '/kelas',   icon: Layers },
-  { title: 'Data Siswa',       url: '/siswa',   icon: Users },
-  { title: 'Data Guru',        url: '/guru',    icon: GraduationCap },
-  { title: 'Mata Pelajaran',   url: '/mapel',   icon: BookOpen },
-  { title: 'Jadwal Pelajaran', url: '/jadwal',  icon: CalendarDays },
-  { title: 'Absensi',          url: '/absensi', icon: ClipboardCheck },
+  { title: 'Data Kelas', url: '/kelas', icon: Layers },
+  { title: 'Data Siswa', url: '/siswa', icon: Users },
+  { title: 'Data Guru', url: '/guru', icon: GraduationCap },
+  { title: 'Mata Pelajaran', url: '/mapel', icon: BookOpen },
+  { title: 'Data Pembelajaran', url: '/pembelajaran', icon: CalendarDays },
+  { title: 'Absensi', url: '/absensi', icon: ClipboardCheck },
 ]
 
 const ADMIN_SYSTEM: MenuItem[] = [
-  { title: 'Tahun Ajaran',   url: '/tahun-ajaran', icon: CalendarDays },
-  { title: 'Semester',       url: '/semester',     icon: Layers },
-  { title: 'Data Pengguna',  url: '/users',        icon: UserCog },
-  { title: 'Pengaturan',     url: '/settings',     icon: Settings },
+  { title: 'Tahun Ajaran', url: '/tahun-ajaran', icon: CalendarDays },
+  { title: 'Semester', url: '/semester', icon: Layers },
+  { title: 'Data Pengguna', url: '/users', icon: UserCog },
+  { title: 'Pengaturan', url: '/settings', icon: Settings },
 ]
 
 const GURU_ITEMS: MenuItem[] = [
   { title: 'Jadwal Mengajar', url: '/jadwal-mengajar', icon: CalendarDays },
-  { title: 'Nilai Siswa',     url: '/nilai',           icon: BookOpen },
-  { title: 'Absensi Kelas',   url: '/absensi-kelas',  icon: ClipboardCheck },
+  { title: 'Nilai Siswa', url: '/nilai', icon: BookOpen },
+  { title: 'Absensi Kelas', url: '/absensi-kelas', icon: ClipboardCheck },
 ]
 
 const SISWA_ITEMS: MenuItem[] = [
   { title: 'Jadwal Pelajaran', url: '/jadwal-siswa', icon: CalendarDays },
-  { title: 'Nilai',            url: '/nilai-siswa',  icon: BookOpen },
-  { title: 'Kehadiran',        url: '/kehadiran',    icon: ClipboardCheck },
+  { title: 'Nilai', url: '/nilai-siswa', icon: BookOpen },
+  { title: 'Kehadiran', url: '/kehadiran', icon: ClipboardCheck },
 ]
 
 // ─── Menu section ─────────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ export function AppSidebar() {
   const avatarInitial = username.charAt(0).toUpperCase()
 
   const mainItems = (() => {
-    switch(role) {
+    switch (role) {
       case 'superadmin': return [...COMMON, ...SUPERADMIN_ITEMS]
       case 'admin': return [...COMMON, ...ADMIN_ITEMS]
       case 'guru': return [...COMMON, ...GURU_ITEMS]

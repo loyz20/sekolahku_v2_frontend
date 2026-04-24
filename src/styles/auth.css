@@ -82,14 +82,17 @@
   z-index: 1;
   display: flex;
   min-height: 100vh;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 /* ── Branding Panel (Left) ── */
 .auth-branding {
   display: none;
-  flex: 1;
+  flex: 1 1 55%;
   position: relative;
-  padding: 40px;
+  padding: 40px 48px;
 }
 
 @media (min-width: 1024px) {
@@ -234,9 +237,10 @@
 
 @media (min-width: 1024px) {
   .auth-form-panel {
-    width: 520px;
-    flex-shrink: 0;
-    padding: 40px;
+    flex: 1 1 45%;
+    min-width: 480px;
+    max-width: 560px;
+    padding: 40px 48px;
   }
 }
 
