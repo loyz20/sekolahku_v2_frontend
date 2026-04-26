@@ -14,7 +14,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://api.sman3tasikmalaya.sch.id/v1",
+        target: "http://localhost:3000",
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ""),

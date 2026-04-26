@@ -38,6 +38,10 @@ import NotificationPage from '@/pages/core/NotificationPage';
 import WaliDashboardPage from '@/pages/wali/WaliDashboardPage';
 import WaliSiswaPage from '@/pages/wali/WaliSiswaPage';
 import WaliPresensiPage from '@/pages/wali/WaliPresensiPage';
+import TPPage from '@/pages/perencanaan/TPPage';
+import ATPPage from '@/pages/perencanaan/ATPPage';
+import ModulAjarPage from '@/pages/perencanaan/ModulAjarPage';
+import CPPage from '@/pages/admin/CPPage';
 
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { Toaster } from 'sonner';
@@ -108,6 +112,10 @@ function App() {
               <Route path="/wali-kelas/dashboard" element={<WaliDashboardPage />} />
               <Route path="/wali-kelas/siswa" element={<WaliSiswaPage />} />
               <Route path="/wali-kelas/presensi" element={<WaliPresensiPage />} />
+              <Route path="/perencanaan-tp" element={<TPPage />} />
+              <Route path="/perencanaan-atp" element={<ATPPage />} />
+              <Route path="/perencanaan-modul" element={<ModulAjarPage />} />
+              <Route path="/perencanaan-cp-master" element={<CPPage />} />
               {/* Add more protected routes here */}
             </Route>
 

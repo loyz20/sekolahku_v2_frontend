@@ -37,6 +37,10 @@ import {
   ShieldAlert,
   HeartHandshake,
   Megaphone,
+  Compass,
+  FileText,
+  Target,
+  BookMarked,
 } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import {
@@ -79,6 +83,7 @@ const ADMIN_ITEMS: MenuItem[] = [
   { title: 'Data Siswa', url: '/siswa', icon: Users },
   { title: 'Data Guru', url: '/guru', icon: GraduationCap },
   { title: 'Mata Pelajaran', url: '/mapel', icon: BookOpen },
+  { title: 'Master CP', url: '/perencanaan-cp-master', icon: BookMarked },
   { title: 'Data Pembelajaran', url: '/pembelajaran', icon: CalendarDays },
   { title: 'Jadwal Pelajaran', url: '/jadwal', icon: CalendarDays },
   { title: 'Master Pelanggaran', url: '/pelanggaran-master', icon: ShieldAlert },
@@ -98,6 +103,9 @@ const ADMIN_SYSTEM: MenuItem[] = [
 
 const GURU_AKADEMIK: MenuItem[] = [
   { title: 'Jadwal Mengajar', url: '/jadwal', icon: CalendarDays },
+  { title: 'Tujuan Pembelajaran', url: '/perencanaan-tp', icon: Target },
+  { title: 'Alur Pembelajaran', url: '/perencanaan-atp', icon: Compass },
+  { title: 'Modul Ajar', url: '/perencanaan-modul', icon: FileText },
   { title: 'Kategori Penilaian', url: '/penilaian-kategori', icon: Calculator },
   { title: 'Input Penilaian', url: '/sumatif', icon: Calculator },
 ]
