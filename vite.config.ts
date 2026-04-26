@@ -11,4 +11,30 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      "/api": {
+        target: "https://api.sman3tasikmalaya.sch.id/v1",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+    },
+  },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('recharts')) return 'vendor-recharts';
+            if (id.includes('xlsx')) return 'vendor-xlsx';
+            if (id.includes('lucide-react') || id.includes('sonner')) return 'vendor-ui';
+            if (id.includes('react') || id.includes('router')) return 'vendor-core';
+            return 'vendor';
+          }
+        }
+      }
+    }
+  }
 })

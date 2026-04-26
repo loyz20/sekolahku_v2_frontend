@@ -3,14 +3,18 @@ import {
   GraduationCap, Users, BookOpen, CalendarDays,
   BellRing, TrendingUp, TrendingDown, Minus,
   Activity, Loader2, Clock, ShieldCheck, UserCog,
-  ArrowUpRight,
+  ArrowUpRight, LayoutGrid, PlusCircle, UserPlus,
+  FileText, Settings, History, Calculator,
+  AlertCircle, HeartHandshake, ShieldAlert, Sparkles, ClipboardCheck
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer,
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
+import { showToast } from '@/lib/toast-utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Stat { title: string; value: number; trend: string; }
@@ -19,9 +23,18 @@ interface Announcement { id?: string; title: string; desc: string; time: string;
 interface DashboardSummary {
   stats: Stat[];
   activities: { name: string; hadir: number; absen: number }[];
+  distribution: { name: string; value: number }[];
   recent_logs: ActivityLog[];
   announcements: Announcement[];
 }
+
+const COLORS = [
+  'var(--primary)',
+  'oklch(0.627 0.265 303.9)', // Violet
+  'oklch(0.769 0.188 70.08)', // Amber
+  'oklch(0.627 0.194 149.21)', // Emerald
+  'oklch(0.601 0.225 33.34)', // Rose
+];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function getGreeting() {
@@ -33,23 +46,36 @@ function getGreeting() {
 }
 
 const STAT_MAP: Record<string, { icon: React.ElementType; color: string; bg: string; border: string; glow: string }> = {
-  'Total Siswa':     { icon: Users,        color: 'text-sky-400',     bg: 'bg-sky-500/10',     border: 'border-sky-500/20',     glow: 'shadow-sky-500/20' },
-  'Total Guru':      { icon: GraduationCap, color: 'text-violet-400',  bg: 'bg-violet-500/10',  border: 'border-violet-500/20',  glow: 'shadow-violet-500/20' },
-  'Mata Pelajaran':  { icon: BookOpen,      color: 'text-amber-400',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20',   glow: 'shadow-amber-500/20' },
-  'Jadwal Hari Ini': { icon: CalendarDays,  color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', glow: 'shadow-emerald-500/20' },
+  'Total Siswa':       { icon: Users,        color: 'text-sky-400',     bg: 'bg-sky-500/10',     border: 'border-sky-500/20',     glow: 'shadow-sky-500/20' },
+  'Total Guru':        { icon: GraduationCap, color: 'text-violet-400',  bg: 'bg-violet-500/10',  border: 'border-violet-500/20',  glow: 'shadow-violet-500/20' },
+  'Total Kelas':       { icon: LayoutGrid,    color: 'text-amber-400',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20',   glow: 'shadow-amber-500/20' },
+  'Jadwal Hari Ini':   { icon: CalendarDays,  color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', glow: 'shadow-emerald-500/20' },
+  'Siswa Pembinaan':   { icon: ShieldCheck,   color: 'text-rose-400',    bg: 'bg-rose-500/10',    border: 'border-rose-500/20',    glow: 'shadow-rose-500/20' },
+  'Siswa Peringatan':  { icon: AlertCircle,   color: 'text-amber-400',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20',   glow: 'shadow-amber-500/20' },
+  'Konseling Bulan Ini': { icon: HeartHandshake, color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20', glow: 'shadow-violet-500/20' },
+  'Poin Net Saya':     { icon: Activity,      color: 'text-primary',     bg: 'bg-primary/10',     border: 'border-primary/20',     glow: 'shadow-primary/20' },
+  'Total Pelanggaran': { icon: ShieldAlert,   color: 'text-rose-400',    bg: 'bg-rose-500/10',    border: 'border-rose-500/20',    glow: 'shadow-rose-500/20' },
+  'Total Prestasi':    { icon: Sparkles,      color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', glow: 'shadow-emerald-500/20' },
+  'Kehadiran':         { icon: ClipboardCheck, color: 'text-sky-400',     bg: 'bg-sky-500/10',     border: 'border-sky-500/20',     glow: 'shadow-sky-500/20' },
 };
 
 function trendIcon(trend: string) {
   const up = /^\+/.test(trend);
   const down = /^-/.test(trend);
+  const warn = /Pembinaan|Peringatan/.test(trend);
+  const good = /Aman|Prestasi/.test(trend);
+
+  if (warn) return { Icon: AlertCircle, cls: 'text-rose-400 bg-rose-500/10' };
+  if (good) return { Icon: Sparkles, cls: 'text-emerald-400 bg-emerald-500/10' };
   if (up)   return { Icon: TrendingUp,   cls: 'text-emerald-400 bg-emerald-500/10' };
-  if (down) return { Icon: TrendingDown, cls: 'text-red-400 bg-red-500/10' };
+  if (down) return { Icon: TrendingDown, cls: 'text-rose-400 bg-rose-500/10' };
   return     { Icon: Minus,              cls: 'text-muted-foreground bg-white/5' };
 }
 
 function roleIcon(role: string) {
   if (role === 'admin') return <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />;
   if (role === 'guru')  return <GraduationCap className="w-3.5 h-3.5 text-violet-400" />;
+  if (role === 'guru_bk') return <HeartHandshake className="w-3.5 h-3.5 text-rose-400" />;
   return <UserCog className="w-3.5 h-3.5 text-sky-400" />;
 }
 
@@ -57,9 +83,15 @@ function roleBadge(role: string) {
   const map: Record<string, string> = {
     admin: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
     guru:  'bg-violet-500/15 text-violet-400 border-violet-500/30',
-    siswa: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    guru_bk: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+    siswa: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
   };
-  const label: Record<string, string> = { admin: 'Administrator', guru: 'Tenaga Pendidik', siswa: 'Peserta Didik' };
+  const label: Record<string, string> = { 
+    admin: 'Administrator', 
+    guru: 'Tenaga Pendidik', 
+    guru_bk: 'Guru BK / Konselor',
+    siswa: 'Peserta Didik' 
+  };
   return { cls: map[role] ?? 'bg-primary/15 text-primary border-primary/30', label: label[role] ?? role };
 }
 
@@ -117,8 +149,27 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
+// ─── Quick Actions ────────────────────────────────────────────────────────────
+function QuickAction({ icon: Icon, label, desc, onClick, color }: any) {
+  return (
+    <button
+      onClick={onClick}
+      className="group flex items-start gap-4 p-4 rounded-2xl border border-white/5 bg-white/2 hover:bg-white/5 hover:border-white/10 transition-all text-left w-full"
+    >
+      <div className={`p-3 rounded-xl ${color} bg-opacity-10 group-hover:scale-110 transition-transform`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <p className="text-sm font-bold text-foreground/90">{label}</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{desc}</p>
+      </div>
+    </button>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -132,7 +183,43 @@ export default function DashboardPage() {
 
   const greeting = getGreeting();
   const badge = roleBadge(user?.role ?? '');
-  const displayName = user?.username ?? 'Pengguna';
+  const displayName = user?.nama || user?.username || 'Pengguna';
+
+  useEffect(() => {
+    if (!isLoading && summary) {
+      const timer = setTimeout(() => {
+        showToast.success(`${greeting}, ${displayName}!`, 'Selamat datang kembali di sistem Sekolahku.');
+      }, 500);
+
+      // Check for teacher schedule
+      if (user?.role === 'guru' && user?.ref_id) {
+        const checkSchedule = async () => {
+          try {
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const today = days[new Date().getDay()];
+            if (today === 'Minggu' || today === 'Sabtu') return; // Skip weekends or check anyway?
+
+            const queryParams = new URLSearchParams({ hari: today, ptk_id: user.ref_id! }).toString();
+            const res = await api.get<{ data: any[] }>(`/jadwal?${queryParams}`);
+            
+            if (res.data && res.data.length > 0) {
+              setTimeout(() => {
+                showToast.info(
+                  `Jadwal Mengajar Hari Ini`,
+                  `Anda memiliki ${res.data.length} jam pelajaran kelas hari ini. Semangat mengajar!`
+                );
+              }, 1500);
+            }
+          } catch (e) {
+            console.error('Failed to fetch today schedule', e);
+          }
+        };
+        checkSchedule();
+      }
+
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, summary, greeting, displayName, user]);
 
   return (
     <div className="flex flex-col gap-8 pb-10 relative animate-in-up">
@@ -170,25 +257,23 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Stat Cards ──────────────────────────────────────────────────────── */}
-      {user?.role === 'admin' && (
-        <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          {isLoading
-            ? Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="rounded-2xl border border-white/5 bg-card/40 p-5 space-y-4">
-                  <div className="flex justify-between">
-                    <Skeleton className="w-10 h-10 rounded-xl" />
-                    <Skeleton className="w-16 h-6 rounded-lg" />
-                  </div>
-                  <Skeleton className="w-24 h-8 rounded" />
-                  <Skeleton className="w-32 h-4 rounded" />
+      <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {isLoading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-white/5 bg-card/40 p-5 space-y-4">
+                <div className="flex justify-between">
+                  <Skeleton className="w-10 h-10 rounded-xl" />
+                  <Skeleton className="w-16 h-6 rounded-lg" />
                 </div>
-              ))
-            : summary?.stats.map((stat, i) => (
-                <StatCard key={stat.title} stat={stat} delay={(i + 1) * 80} />
-              ))
-          }
-        </div>
-      )}
+                <Skeleton className="w-24 h-8 rounded" />
+                <Skeleton className="w-32 h-4 rounded" />
+              </div>
+            ))
+          : summary?.stats.map((stat, i) => (
+              <StatCard key={stat.title} stat={stat} delay={(i + 1) * 80} />
+            ))
+        }
+      </div>
 
       {/* ── Main Grid ───────────────────────────────────────────────────────── */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
@@ -199,9 +284,11 @@ export default function DashboardPage() {
             <div>
               <h2 className="font-semibold flex items-center gap-2">
                 <Activity className="w-4 h-4 text-primary" />
-                Grafik Kehadiran
+                {user?.role === 'guru' ? 'Kehadiran Siswa (Jurnal)' : user?.role === 'siswa' ? 'Tren Kehadiran Saya' : 'Grafik Kehadiran'}
               </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">7 hari terakhir · Hadir vs Absen/Izin</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {user?.role === 'guru' ? '7 pertemuan terakhir yang Anda isi' : '7 hari terakhir · Hadir vs Absen/Izin'}
+              </p>
             </div>
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
@@ -223,20 +310,20 @@ export default function DashboardPage() {
                 <AreaChart data={summary.activities} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gHadir" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="hsl(var(--primary))"     stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))"     stopOpacity={0}    />
+                      <stop offset="5%"  stopColor="var(--primary)"     stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="var(--primary)"     stopOpacity={0}    />
                     </linearGradient>
                     <linearGradient id="gAbsen" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="hsl(var(--destructive))" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0}    />
+                      <stop offset="5%"  stopColor="var(--destructive)" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="var(--destructive)" stopOpacity={0}    />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} dy={8} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} dx={-8} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} dy={8} />
+                  <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} dx={-8} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Area type="monotone" dataKey="hadir" name="Hadir"      stroke="hsl(var(--primary))"     strokeWidth={2.5} fill="url(#gHadir)" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} />
-                  <Area type="monotone" dataKey="absen" name="Absen/Izin" stroke="hsl(var(--destructive))" strokeWidth={2.5} fill="url(#gAbsen)" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} />
+                  <Area type="monotone" dataKey="hadir" name="Hadir"      stroke="var(--primary)"     strokeWidth={2.5} fill="url(#gHadir)" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} />
+                  <Area type="monotone" dataKey="absen" name="Absen/Izin" stroke="var(--destructive)" strokeWidth={2.5} fill="url(#gAbsen)" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
@@ -299,6 +386,126 @@ export default function DashboardPage() {
                 </div>
               )
             }
+          </div>
+        </div>
+      </div>
+
+      {/* ── Second Row Grid ─────────────────────────────────────────────────── */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
+        
+        {/* Student Distribution — 3 cols */}
+        <div className="col-span-1 lg:col-span-3 animate-in-up delay-500 rounded-2xl border border-white/8 bg-card/50 backdrop-blur-sm shadow-lg overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-white/5">
+            <div>
+              <h2 className="font-semibold flex items-center gap-2">
+                <Users className="w-4 h-4 text-sky-400" />
+                {user?.role === 'siswa' ? 'Statistik Rombel' : 'Distribusi Siswa'}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Proporsi jumlah siswa per rombel</p>
+            </div>
+          </div>
+          <div className="p-4 h-[280px]">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-8 h-8 animate-spin text-sky-400" />
+              </div>
+            ) : summary?.distribution?.length ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={summary.distribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {summary.distribution.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '12px' }}
+                    itemStyle={{ color: '#fff', fontSize: '12px' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
+                  <LayoutGrid className="w-6 h-6 text-sky-400" />
+                </div>
+                <p className="text-sm text-muted-foreground">Belum ada data distribusi.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Actions — 4 cols */}
+        <div className="col-span-1 lg:col-span-4 animate-in-up delay-600 rounded-2xl border border-white/8 bg-card/50 backdrop-blur-sm shadow-lg overflow-hidden p-6">
+          <div className="mb-6">
+            <h2 className="font-semibold flex items-center gap-2">
+              <PlusCircle className="w-4 h-4 text-primary" />
+              Aksi Cepat
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Akses cepat fitur manajemen utama</p>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {user?.role === 'admin' ? (
+              <>
+                <QuickAction 
+                  icon={UserPlus} 
+                  label="Tambah Siswa" 
+                  desc="Registrasi peserta didik baru" 
+                  color="text-sky-400"
+                  onClick={() => navigate('/siswa')} 
+                />
+                <QuickAction 
+                  icon={GraduationCap} 
+                  label="Tambah Guru" 
+                  desc="Input data tenaga pendidik" 
+                  color="text-violet-400"
+                  onClick={() => navigate('/guru')} 
+                />
+                <QuickAction 
+                  icon={FileText} 
+                  label="Buat Pengumuman" 
+                  desc="Kirim informasi ke dashboard" 
+                  color="text-amber-400"
+                  onClick={() => navigate('/pengumuman')} 
+                />
+                <QuickAction 
+                  icon={Settings} 
+                  label="Pengaturan" 
+                  desc="Konfigurasi sistem sekolah" 
+                  color="text-emerald-400"
+                  onClick={() => navigate('/settings')} 
+                />
+              </>
+            ) : user?.role === 'guru' ? (
+              <>
+                <QuickAction icon={PlusCircle} label="Isi Jurnal Baru" desc="Catat materi & kehadiran hari ini" color="text-primary" onClick={() => navigate('/jurnal')} />
+                <QuickAction icon={History} label="Riwayat Jurnal" desc="Lihat catatan mengajar sebelumnya" color="text-violet-400" onClick={() => navigate('/jurnal-riwayat')} />
+                <QuickAction icon={Calculator} label="Input Penilaian" desc="Masukkan nilai sumatif siswa" color="text-amber-400" onClick={() => navigate('/sumatif')} />
+                <QuickAction icon={Users} label="Daftar Kelas" desc="Lihat detail rombel & siswa" color="text-emerald-400" onClick={() => navigate('/kelas')} />
+              </>
+            ) : user?.role === 'guru_bk' ? (
+              <>
+                <QuickAction icon={ShieldAlert} label="Catat Pelanggaran" desc="Input insiden kedisiplinan siswa" color="text-rose-400" onClick={() => navigate('/pelanggaran-siswa')} />
+                <QuickAction icon={Sparkles} label="Input Prestasi" desc="Catat penghargaan & apresiasi" color="text-emerald-400" onClick={() => navigate('/prestasi-siswa')} />
+                <QuickAction icon={HeartHandshake} label="Konseling Baru" desc="Buat catatan bimbingan siswa" color="text-violet-400" onClick={() => navigate('/bimbingan-konseling')} />
+                <QuickAction icon={Users} label="Pantau Siswa" desc="Lihat status & poin net siswa" color="text-sky-400" onClick={() => navigate('/pelanggaran-siswa')} />
+              </>
+            ) : user?.role === 'siswa' ? (
+              <>
+                <QuickAction icon={CalendarDays} label="Jadwal Pelajaran" desc="Cek jadwal belajar hari ini" color="text-primary" onClick={() => navigate('/jadwal')} />
+                <QuickAction icon={BookOpen} label="Lihat Nilai" desc="Pantau capaian hasil belajar" color="text-violet-400" onClick={() => navigate('/nilai-siswa')} />
+                <QuickAction icon={ShieldCheck} label="Buku Saku BK" desc="Cek poin & status perilaku" color="text-amber-400" onClick={() => navigate('/pelanggaran-siswa')} />
+                <QuickAction icon={ClipboardCheck} label="Kehadiran" desc="Cek rekap presensi saya" color="text-emerald-400" onClick={() => navigate('/jurnal-siswa')} />
+              </>
+            ) : null}
           </div>
         </div>
       </div>

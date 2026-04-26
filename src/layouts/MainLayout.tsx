@@ -12,36 +12,23 @@ import {
 } from "lucide-react"
 import React from "react"
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type NotifType = 'info' | 'success' | 'warning'
+import { useNotifications } from "@/contexts/NotificationContext"
+import type { Notification as NotifData } from "@/contexts/NotificationContext"
+import { formatDistanceToNow } from "date-fns"
+import { id as idLocale } from "date-fns/locale"
 
-interface Notification {
-  id: number
-  type: NotifType
-  title: string
-  desc: string
-  time: string
-  read: boolean
-}
-
-// ─── Mock notifications ───────────────────────────────────────────────────────
-const MOCK_NOTIFS: Notification[] = [
-  { id: 1, type: 'info',    title: 'Data siswa diperbarui', desc: 'Admin menambahkan 3 siswa baru ke kelas XII-A.', time: '5 menit lalu',  read: false },
-  { id: 2, type: 'success', title: 'Backup berhasil',       desc: 'Backup data otomatis selesai tanpa error.',         time: '1 jam lalu',   read: false },
-  { id: 3, type: 'warning', title: 'Sesi hampir habis',     desc: 'Sesi login Anda akan berakhir dalam 30 menit.',    time: '2 jam lalu',   read: true  },
-  { id: 4, type: 'info',    title: 'Jadwal diperbarui',     desc: 'Jadwal pelajaran Senin minggu depan telah diubah.', time: '1 hari lalu',  read: true  },
-]
-
-// ─── Notif icon ───────────────────────────────────────────────────────────────
-function NotifIcon({ type }: { type: NotifType }) {
+// ─── Notif helpers ────────────────────────────────────────────────────────────
+function NotifIcon({ type }: { type: 'info' | 'success' | 'warning' | 'error' }) {
   if (type === 'success') return <CheckCircle2 className="w-4 h-4 text-emerald-400" />
   if (type === 'warning') return <AlertTriangle className="w-4 h-4 text-amber-400" />
+  if (type === 'error') return <X className="w-4 h-4 text-red-400" />
   return <Info className="w-4 h-4 text-sky-400" />
 }
 
-function notifDotColor(type: NotifType) {
+function notifDotColor(type: string) {
   if (type === 'success') return 'bg-emerald-400'
   if (type === 'warning') return 'bg-amber-400'
+  if (type === 'error') return 'bg-red-400'
   return 'bg-sky-400'
 }
 
@@ -52,12 +39,12 @@ function NotificationPanel({
   onReadAll,
   onClose,
 }: {
-  notifs: Notification[]
-  onRead: (id: number) => void
+  notifs: NotifData[]
+  onRead: (id: string) => void
   onReadAll: () => void
   onClose: () => void
 }) {
-  const unread = notifs.filter(n => !n.read).length
+  const unread = notifs.filter(n => !n.is_read).length
 
   return (
     <div className="absolute right-0 top-full mt-3 w-80 sm:w-96 rounded-2xl border border-white/10 bg-card/95 backdrop-blur-xl shadow-2xl z-50 overflow-hidden animate-in-up">
@@ -97,22 +84,24 @@ function NotificationPanel({
             <button
               key={n.id}
               onClick={() => onRead(n.id)}
-              className={`w-full flex items-start gap-3 px-5 py-4 text-left border-b border-white/5 last:border-0 transition-colors hover:bg-white/4 ${n.read ? 'opacity-60' : ''}`}
+              className={`w-full flex items-start gap-3 px-5 py-4 text-left border-b border-white/5 last:border-0 transition-colors hover:bg-white/4 ${n.is_read ? 'opacity-60' : ''}`}
             >
               <div className={`mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                n.type === 'success' ? 'bg-emerald-500/15' : n.type === 'warning' ? 'bg-amber-500/15' : 'bg-sky-500/15'
+                n.type === 'success' ? 'bg-emerald-500/15' : n.type === 'warning' ? 'bg-amber-500/15' : n.type === 'error' ? 'bg-red-500/15' : 'bg-sky-500/15'
               }`}>
-                <NotifIcon type={n.type} />
+                <NotifIcon type={n.type as any} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold truncate">{n.title}</p>
-                  {!n.read && (
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${notifDotColor(n.type)}`} />
+                  {!n.is_read && (
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${notifDotColor(n.type as any)}`} />
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.desc}</p>
-                <p className="text-[11px] text-muted-foreground/50 mt-1">{n.time}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                <p className="text-[11px] text-muted-foreground/50 mt-1">
+                  {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: idLocale })}
+                </p>
               </div>
             </button>
           ))
@@ -120,13 +109,20 @@ function NotificationPanel({
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-3 border-t border-white/5">
+      <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between">
         <Link
           to="/notifications"
           onClick={onClose}
-          className="block text-center text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+          className="text-[10px] text-primary hover:text-primary/80 transition-colors font-black uppercase tracking-widest"
         >
-          Lihat semua notifikasi
+          Lihat Semua
+        </Link>
+        <Link
+          to="/settings?tab=notifications"
+          onClick={onClose}
+          className="text-[10px] text-muted-foreground hover:text-foreground transition-colors font-bold uppercase tracking-widest"
+        >
+          Pengaturan
         </Link>
       </div>
     </div>
@@ -162,27 +158,19 @@ export default function MainLayout() {
   const location = useLocation()
   const paths = location.pathname.split('/').filter(Boolean)
 
-  const [notifs, setNotifs] = useState<Notification[]>(MOCK_NOTIFS)
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
   const [open, setOpen] = useState(false)
-
-  const unreadCount = notifs.filter(n => !n.read).length
-
-  const markRead = (id: number) =>
-    setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-
-  const markAllRead = () =>
-    setNotifs(prev => prev.map(n => ({ ...n, read: true })))
 
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
         {/* ── Top Header ──────────────────────────────────────────────────── */}
-        <header className="glass-header flex h-16 shrink-0 items-center justify-between gap-4 px-4 sm:px-6 sticky top-0 z-30 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+        <header className="glass-header flex h-16 shrink-0 items-center justify-between gap-2 px-3 sm:px-6 sticky top-0 z-30 transition-all duration-300">
           {/* Left: trigger + breadcrumb */}
-          <div className="flex items-center gap-2 min-w-0">
-            <SidebarTrigger className="-ml-1 shrink-0" />
-            <Separator orientation="vertical" className="mr-1 h-4 shrink-0" />
+          <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+            <SidebarTrigger className="-ml-1 shrink-0 scale-90 sm:scale-100" />
+            <Separator orientation="vertical" className="mr-1 h-4 shrink-0 opacity-50" />
             <Breadcrumb className="min-w-0">
               <BreadcrumbList className="flex-nowrap">
                 {paths.map((segment, index) => {
@@ -237,9 +225,9 @@ export default function MainLayout() {
                 <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
                 <div className="relative z-50">
                   <NotificationPanel
-                    notifs={notifs}
-                    onRead={markRead}
-                    onReadAll={markAllRead}
+                    notifs={notifications}
+                    onRead={markAsRead}
+                    onReadAll={markAllAsRead}
                     onClose={() => setOpen(false)}
                   />
                 </div>

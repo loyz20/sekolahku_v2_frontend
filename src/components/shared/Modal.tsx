@@ -7,17 +7,21 @@ interface ModalProps {
   title: string;
   description?: string;
   icon?: React.ReactNode;
+  isOpen?: boolean;
   onClose: () => void;
   onSubmit?: () => void;
   submitLabel?: string;
   submitDisabled?: boolean;
   saving?: boolean;
+  submitVariant?: 'default' | 'destructive' | 'outline';
   children: React.ReactNode;
   footerContent?: React.ReactNode;
+  showFooter?: boolean;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
 }
 
 export function Modal({
+  isOpen = true,
   title,
   description,
   icon,
@@ -28,7 +32,9 @@ export function Modal({
   saving = false,
   children,
   footerContent,
-  maxWidth = 'md'
+  showFooter = true,
+  maxWidth = 'md',
+  submitVariant = 'default'
 }: ModalProps) {
   const widthMap = {
     sm: 'max-w-sm',
@@ -39,6 +45,8 @@ export function Modal({
     '3xl': 'max-w-3xl',
     '4xl': 'max-w-4xl',
   };
+
+  if (!isOpen) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[9999]">
@@ -73,19 +81,21 @@ export function Modal({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end px-6 py-4 border-t border-white/5 bg-white/2 gap-3">
-            {footerContent ? footerContent : (
-              <>
-                <Button variant="outline" onClick={onClose} className="border-white/10 hover:bg-white/5 text-sm h-9">Batal</Button>
-                {onSubmit && (
-                  <Button onClick={onSubmit} disabled={submitDisabled || saving} className="gap-2 min-w-[120px] text-sm h-9">
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                    {saving ? 'Menyimpan...' : submitLabel}
-                  </Button>
-                )}
-              </>
-            )}
-          </div>
+          {showFooter && (
+            <div className="flex items-center justify-end px-6 py-4 border-t border-white/5 bg-white/2 gap-3">
+              {footerContent ? footerContent : (
+                <>
+                  <Button variant="outline" onClick={onClose} className="border-white/10 hover:bg-white/5 text-sm h-9">Batal</Button>
+                  {onSubmit && (
+                    <Button onClick={onSubmit} variant={submitVariant} disabled={submitDisabled || saving} className="gap-2 min-w-[120px] text-sm h-9">
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                      {saving ? 'Menyimpan...' : submitLabel}
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>,

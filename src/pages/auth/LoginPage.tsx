@@ -1,39 +1,84 @@
 import { useState, useCallback, type FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { loginSchema, validateForm, type LoginFormData } from '@/lib/validations';
 
 export default function LoginPage() {
   const { login, error, clearError, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [formData, setFormData] = useState({ username: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [touched, setTouched] = useState({ username: false, password: false });
+  const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
 
-  const usernameError = touched.username && username.length < 3 ? 'Username minimal 3 karakter' : '';
-  const passwordError = touched.password && password.length < 6 ? 'Password minimal 6 karakter' : '';
-  const isValid = username.length >= 3 && password.length >= 6;
+  const validateField = (field: keyof LoginFormData, value: string) => {
+    const result = validateForm(loginSchema, { ...formData, [field]: value });
+    if (!result.success && result.errors) {
+      setValidationErrors((prev) => ({
+        ...prev,
+        [field]: result.errors![field] || [],
+      }));
+    } else {
+      setValidationErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    if (touched[name as keyof typeof touched]) {
+      validateField(name as keyof LoginFormData, value);
+    }
+    
+    if (error) clearError();
+  };
+
+  const handleBlur = (field: keyof LoginFormData) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    validateField(field, formData[field]);
+  };
+
+  const isFormValid = (() => {
+    const result = validateForm(loginSchema, formData);
+    return result.success;
+  })();
 
   const handleSubmit = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
+      
+      // Mark all fields as touched
       setTouched({ username: true, password: true });
 
-      if (!isValid) return;
+      // Validate form
+      const result = validateForm(loginSchema, formData);
+      if (!result.success) {
+        setValidationErrors(result.errors || {});
+        return;
+      }
 
       try {
-        await login(username, password);
+        await login(formData.username, formData.password);
         navigate(from, { replace: true });
       } catch {
         // error is handled in context
       }
     },
-    [username, password, isValid, login, navigate, from]
+    [formData, login, navigate, from]
   );
+
+  const getFieldError = (field: keyof LoginFormData): string | undefined => {
+    return validationErrors[field]?.[0];
+  };
 
   return (
     <div className="auth-form-wrapper">
@@ -78,7 +123,7 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit} className="auth-form" noValidate>
         {/* Username field */}
-        <div className={`auth-field ${usernameError ? 'auth-field-error' : ''}`}>
+        <div className={`auth-field ${getFieldError('username') ? 'auth-field-error' : ''}`}>
           <label htmlFor="login-username" className="auth-label">
             Username
           </label>
@@ -92,24 +137,24 @@ export default function LoginPage() {
             <input
               id="login-username"
               type="text"
+              name="username"
               className="auth-input"
               placeholder="Masukkan username"
-              value={username}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                if (error) clearError();
-              }}
-              onBlur={() => setTouched((t) => ({ ...t, username: true }))}
+              value={formData.username}
+              onChange={handleChange}
+              onBlur={() => handleBlur('username')}
               autoComplete="username"
               autoFocus
               disabled={isLoading}
             />
           </div>
-          {usernameError && <p className="auth-field-message">{usernameError}</p>}
+          {getFieldError('username') && (
+            <p className="auth-field-message">{getFieldError('username')}</p>
+          )}
         </div>
 
         {/* Password field */}
-        <div className={`auth-field ${passwordError ? 'auth-field-error' : ''}`}>
+        <div className={`auth-field ${getFieldError('password') ? 'auth-field-error' : ''}`}>
           <label htmlFor="login-password" className="auth-label">
             Password
           </label>
@@ -123,14 +168,12 @@ export default function LoginPage() {
             <input
               id="login-password"
               type={showPassword ? 'text' : 'password'}
+              name="password"
               className="auth-input"
               placeholder="Masukkan password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (error) clearError();
-              }}
-              onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+              value={formData.password}
+              onChange={handleChange}
+              onBlur={() => handleBlur('password')}
               autoComplete="current-password"
               disabled={isLoading}
             />
@@ -156,14 +199,16 @@ export default function LoginPage() {
               )}
             </button>
           </div>
-          {passwordError && <p className="auth-field-message">{passwordError}</p>}
+          {getFieldError('password') && (
+            <p className="auth-field-message">{getFieldError('password')}</p>
+          )}
         </div>
 
         {/* Submit button */}
         <button
           type="submit"
           className="auth-submit"
-          disabled={isLoading}
+          disabled={isLoading || !isFormValid}
           id="login-submit"
         >
           {isLoading ? (

@@ -5,6 +5,12 @@ interface User {
   id: string;
   username: string;
   role: string;
+  nama?: string;
+  sekolah_id?: string;
+  ref_id?: string;
+  email?: string;
+  phone?: string;
+  is_wali_kelas?: boolean;
 }
 
 interface AuthContextType {
@@ -15,6 +21,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   error: string | null;
   clearError: () => void;
+  setUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -25,15 +32,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   // Restore user from localStorage on mount
+  // Tokens are automatically sent via httpOnly cookies, so we only need to restore user info
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem('user');
-      const accessToken = localStorage.getItem('access_token');
-      if (storedUser && accessToken) {
+      if (storedUser) {
         setUser(JSON.parse(storedUser));
       }
     } catch {
-      api.clearTokens();
+      // Clear invalid user data
+      localStorage.removeItem('user');
     } finally {
       setIsLoading(false);
     }
@@ -46,18 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await api.post<{
         data: {
-          access_token: string;
-          refresh_token: string;
           user: User;
         };
       }>('/auth/login', { username, password });
 
-      const { access_token, refresh_token, user: userData } = response.data;
+      const userData = response.data.user;
 
-      localStorage.setItem('access_token', access_token);
-      localStorage.setItem('refresh_token', refresh_token);
+      // Store only user info in localStorage (tokens are in httpOnly cookies)
       localStorage.setItem('user', JSON.stringify(userData));
-
       setUser(userData);
     } catch (err) {
       const apiError = err as ApiError;
@@ -70,14 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      const refreshToken = localStorage.getItem('refresh_token');
-      if (refreshToken) {
-        await api.post('/auth/logout', { refresh_token: refreshToken });
-      }
+      // Tokens are in httpOnly cookies, server will clear them
+      await api.post('/auth/logout', {});
     } catch {
       // Ignore logout errors
     } finally {
-      api.clearTokens();
+      localStorage.removeItem('user');
       setUser(null);
     }
   }, []);
@@ -94,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         error,
         clearError,
+        setUser,
       }}
     >
       {children}

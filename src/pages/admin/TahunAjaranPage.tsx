@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/shared/DataTable';
 import { Modal } from '@/components/shared/Modal';
 import { FormField } from '@/components/shared/FormField';
+import { PageHero } from '@/components/shared/PageHero';
 
 interface TahunAjaran {
   id: string;
@@ -95,20 +96,18 @@ export default function TahunAjaranPage() {
 
   return (
     <div className="w-full p-6 space-y-6 mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center">
-              <CalendarDays className="w-5 h-5 text-amber-400" />
-            </div>
-            TAHUN AJARAN
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">Konfigurasi periode akademik sekolah</p>
-        </div>
-        <Button onClick={openAdd} className="gap-2 shadow-lg shadow-amber-500/20">
-          <Plus className="w-4 h-4" /> Tambah Tahun
-        </Button>
-      </div>
+      <PageHero
+        title="TAHUN AJARAN"
+        description="Konfigurasi periode akademik sekolah"
+        icon={<CalendarDays className="w-5 h-5" />}
+        variant="amber"
+        breadcrumb="Sistem / Konfigurasi Akademik"
+        actions={
+          <Button onClick={openAdd} className="gap-2 shadow-lg shadow-amber-500/20 bg-amber-600 hover:bg-amber-700 font-bold uppercase tracking-tight text-xs h-11 px-6">
+            <Plus className="w-4 h-4" /> Tambah Tahun
+          </Button>
+        }
+      />
 
       <DataTable
         columns={columns}

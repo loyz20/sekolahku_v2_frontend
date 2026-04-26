@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/shared/DataTable';
 import { Modal } from '@/components/shared/Modal';
 import { FormField } from '@/components/shared/FormField';
+import { PageHero } from '@/components/shared/PageHero';
 
 interface TahunAjaran { id: string; tahun: string; }
 interface Semester {
@@ -107,20 +108,18 @@ export default function SemesterPage() {
 
   return (
     <div className="w-full p-6 space-y-6 mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center">
-              <Layers className="w-5 h-5 text-violet-400" />
-            </div>
-            SEMESTER
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">Kelola pembagian periode semester akademik</p>
-        </div>
-        <Button onClick={openAdd} className="gap-2 shadow-lg shadow-violet-500/20">
-          <Plus className="w-4 h-4" /> Tambah Semester
-        </Button>
-      </div>
+      <PageHero
+        title="SEMESTER"
+        description="Kelola pembagian periode semester akademik"
+        icon={<Layers className="w-5 h-5" />}
+        variant="violet"
+        breadcrumb="Sistem / Konfigurasi Akademik"
+        actions={
+          <Button onClick={openAdd} className="gap-2 shadow-lg shadow-violet-500/20 bg-violet-600 hover:bg-violet-700 font-bold uppercase tracking-tight text-xs h-11 px-6">
+            <Plus className="w-4 h-4" /> Tambah Semester
+          </Button>
+        }
+      />
 
       <DataTable
         columns={columns}

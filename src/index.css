@@ -127,6 +127,10 @@
   html {
     @apply font-sans;
     }
+  
+  option {
+    @apply bg-zinc-900 text-white;
+  }
 }
 
 /* ==========================================

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
-import { ClipboardCheck, Calendar, MapPin, User, Search } from 'lucide-react';
 import { DataTable } from '@/components/shared/DataTable';
+import { PageHero } from '@/components/shared/PageHero';
+import { ClipboardCheck, Calendar, MapPin, User, Search } from 'lucide-react';
 
 interface Absensi {
   id: string;
@@ -95,17 +96,15 @@ export default function AbsensiPage() {
 
   return (
     <div className="w-full p-6 space-y-6 mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center">
-              <ClipboardCheck className="w-5 h-5 text-indigo-400" />
-            </div>
-            REKAP ABSENSI
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">Monitoring kehadiran harian peserta didik</p>
-        </div>
+      <PageHero
+        title="REKAP ABSENSI"
+        description="Monitoring kehadiran harian peserta didik"
+        icon={<ClipboardCheck className="w-5 h-5" />}
+        variant="indigo"
+        breadcrumb="Akademik / Presensi Kehadiran"
+      />
 
+      <div className="flex flex-col md:flex-row md:items-center justify-end gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5">
             <Calendar className="w-4 h-4 text-muted-foreground" />
