@@ -1,22 +1,36 @@
-import { useState, useEffect, useCallback } from 'react';
-import { api } from '@/lib/api';
-import {
+import React, { useState, useEffect } from 'react';
+import { 
+    Plus, 
+    Sparkles, 
+    Save, 
+    List, 
+    Target, 
+    BookOpen,
+    Trash2,
+    Search,
+    Filter,
     FileText,
-    Plus,
-    Save,
-    Sparkles,
-    Layout,
-    Type,
-    List,
-    Target
+    History,
+    Download,
+    Menu,
+    X,
+    Zap
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { SearchableSelect } from '@/components/shared/SearchableSelect';
-import { PageHero } from '@/components/shared/PageHero';
-import { showToast } from '@/lib/toast-utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { showToast } from '@/lib/toast-utils';
+import { api } from '@/lib/api';
+
+interface ModulAjarDetail {
+    id?: string;
+    tp_id: string;
+    judul: string;
+    konten_json: any;
+    langkah_pembelajaran: string;
+    media: string;
+    asesmen: string;
+    is_generated_ai: boolean;
+}
 
 interface TP {
     id: string;
@@ -24,288 +38,445 @@ interface TP {
     deskripsi: string;
 }
 
-interface ModulAjar {
-    id?: string;
-    tp_id: string;
-    judul: string;
-    konten_json: any;
-    is_generated_ai: boolean;
-}
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 
-interface Pembelajaran {
-    id: string;
-    mata_pelajaran_nama: string;
-    rombel_nama: string;
-}
-
-export default function ModulAjarPage() {
-    const [pembelajarans, setPembelajarans] = useState<Pembelajaran[]>([]);
-    const [selectedPembelajaran, setSelectedPembelajaran] = useState('');
+const ModulAjarPage: React.FC = () => {
+    const [mapels, setMapels] = useState<any[]>([]);
+    const [selectedMapel, setSelectedMapel] = useState('');
+    const [selectedFase, setSelectedFase] = useState('');
     const [tpList, setTpList] = useState<TP[]>([]);
     const [selectedTP, setSelectedTP] = useState('');
-    const [modulList, setModulList] = useState<ModulAjar[]>([]);
-    const [activeModul, setActiveModul] = useState<ModulAjar | null>(null);
-    const [saving, setSaving] = useState(false);
+    const [modulList, setModulList] = useState<ModulAjarDetail[]>([]);
+    const [activeModul, setActiveModul] = useState<ModulAjarDetail | null>(null);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showMobileKoleksi, setShowMobileKoleksi] = useState(false);
 
-    const fetchPembelajaran = async () => {
+    useEffect(() => {
+        fetchMapel();
+    }, []);
+
+    useEffect(() => {
+        if (selectedMapel && selectedFase) {
+            setSelectedTP(''); // Reset TP saat mapel/fase ganti
+            fetchTP();
+            fetchModul();
+        }
+    }, [selectedMapel, selectedFase]);
+
+    const fetchMapel = async () => {
         try {
+            // Ambil mata pelajaran yang diajar oleh guru ini
             const res = await api.get<any>('/pembelajaran?limit=100');
-            setPembelajarans(res.data.items || []);
+            const items = res.data?.items || [];
+            
+            const uniqueMapels = Array.from(new Map(items.map((item: any) => [
+                item.mata_pelajaran_id, 
+                { id: item.mata_pelajaran_id, nama: item.mata_pelajaran_nama, phases: [] as string[] }
+            ])).values()) as { id: string, nama: string, phases: string[] }[];
+
+            items.forEach((item: any) => {
+                const mapel = uniqueMapels.find(m => m.id === item.mata_pelajaran_id);
+                if (mapel && item.fase && !mapel.phases.includes(item.fase)) {
+                    mapel.phases.push(item.fase);
+                }
+            });
+
+            setMapels(uniqueMapels);
         } catch (error) {
-            showToast.error('Gagal mengambil data pembelajaran');
+            showToast.error('Gagal mengambil data mata pelajaran mengajar');
         }
     };
 
-    const fetchTP = useCallback(async () => {
-        if (!selectedPembelajaran) return;
+    const fetchTP = async () => {
         try {
-            const res = await api.get<any>(`/perencanaan/tp?pembelajaran_id=${selectedPembelajaran}`);
+            const res = await api.get<any>(`/perencanaan/tp?mapel_id=${selectedMapel}&fase=${selectedFase}`);
             setTpList(res.data || []);
         } catch (error) {
             showToast.error('Gagal mengambil data TP');
         }
-    }, [selectedPembelajaran]);
+    };
 
-    const fetchModul = useCallback(async () => {
-        if (!selectedTP) return;
+    const fetchModul = async () => {
         try {
-            const res = await api.get<any>(`/perencanaan/modul-ajar?tp_id=${selectedTP}`);
+            const res = await api.get<any>(`/perencanaan/modul-ajar?mapel=${selectedMapel}&fase=${selectedFase}`);
             setModulList(res.data || []);
         } catch (error) {
             showToast.error('Gagal mengambil daftar modul');
         }
-    }, [selectedTP]);
+    };
 
-    useEffect(() => {
-        fetchPembelajaran();
-    }, []);
+    const handleGenerateAI = async () => {
+        if (!selectedTP) return showToast.error('Pilih Tujuan Pembelajaran terlebih dahulu');
+        const tp = tpList.find(t => t.id === selectedTP);
+        const mapelObj = mapels.find(m => m.id === selectedMapel);
+        
+        setIsGenerating(true);
+        try {
+            const res = await api.post<any>('/perencanaan/modul-ajar/generate', {
+                mapel: mapelObj?.nama,
+                fase: selectedFase,
+                tp_deskripsi: tp?.deskripsi
+            });
+            
+            const generated = res.data;
+            setActiveModul({
+                tp_id: selectedTP,
+                judul: generated.judul || `Modul Ajar - ${tp?.kode}`,
+                langkah_pembelajaran: generated.langkah_pembelajaran,
+                media: generated.media,
+                asesmen: generated.asesmen,
+                konten_json: generated,
+                is_generated_ai: true
+            });
+            showToast.success('Modul Ajar berhasil disusun oleh AI');
+        } catch (error: any) {
+            showToast.error(error.response?.data?.message || 'Gagal generate modul');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
-    useEffect(() => {
-        if (selectedPembelajaran) fetchTP();
-    }, [selectedPembelajaran, fetchTP]);
+    const handleSave = async () => {
+        if (!activeModul) return;
+        setIsSaving(true);
+        try {
+            await api.post('/perencanaan/modul-ajar', {
+                ...activeModul,
+                konten_json: {
+                    langkah_pembelajaran: activeModul.langkah_pembelajaran,
+                    media: activeModul.media,
+                    asesmen: activeModul.asesmen
+                }
+            });
+            showToast.success('Modul Ajar berhasil disimpan');
+            fetchModul();
+        } catch (error) {
+            showToast.error('Gagal menyimpan modul');
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
-    useEffect(() => {
-        if (selectedTP) fetchModul();
-    }, [selectedTP, fetchModul]);
+    const handleSelectModul = (m: ModulAjarDetail) => {
+        let safeKonten = m.konten_json;
+        if (typeof safeKonten === 'string') {
+            try { safeKonten = JSON.parse(safeKonten); } catch (e) { safeKonten = {}; }
+        }
+
+        const safeModul = {
+            ...m,
+            langkah_pembelajaran: m.langkah_pembelajaran || safeKonten?.langkah_pembelajaran || '',
+            media: m.media || safeKonten?.media || '',
+            asesmen: m.asesmen || safeKonten?.asesmen || '',
+            konten_json: safeKonten
+        };
+        setActiveModul(safeModul);
+    };
+
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (!confirm('Hapus Modul Ajar ini?')) return;
+        try {
+            await api.delete(`/perencanaan/modul-ajar/${id}`);
+            showToast.success('Modul Ajar berhasil dihapus');
+            if (activeModul?.id === id) setActiveModul(null);
+            fetchModul();
+        } catch (error) {
+            showToast.error('Gagal menghapus modul');
+        }
+    };
 
     const handleNewModul = () => {
         if (!selectedTP) return;
         const tp = tpList.find(t => t.id === selectedTP);
         setActiveModul({
             tp_id: selectedTP,
-            judul: `Modul Ajar: ${tp?.kode}`,
-            konten_json: {
-                tujuan: tp?.deskripsi,
-                langkah_pembelajaran: '',
-                media: '',
-                asesmen: ''
-            },
+            judul: `Modul Baru - ${tp?.kode}`,
+            langkah_pembelajaran: '',
+            media: '',
+            asesmen: '',
+            konten_json: {},
             is_generated_ai: false
         });
     };
 
-    const handleSave = async () => {
-        if (!activeModul) return;
-        setSaving(true);
-        try {
-            await api.post('/perencanaan/modul-ajar', activeModul);
-            showToast.success('Modul Ajar berhasil disimpan');
-            fetchModul();
-            setActiveModul(null);
-        } catch (error) {
-            showToast.error('Gagal menyimpan modul');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const generateWithAI = () => {
-        if (!activeModul) return;
-        showToast.info('AI sedang merumuskan modul...', 'Mohon tunggu sebentar.');
-        // Simulation
-        setTimeout(() => {
-            setActiveModul({
-                ...activeModul,
-                is_generated_ai: true,
-                konten_json: {
-                    ...activeModul.konten_json,
-                    langkah_pembelajaran: "1. Pendahuluan (15 menit): Doa, Absensi, Apersepsi.\n2. Inti (60 menit): Eksplorasi materi menggunakan media interaktif, Diskusi Kelompok, Presentasi.\n3. Penutup (15 menit): Refleksi, Kesimpulan, dan Rencana Pertemuan Berikutnya.",
-                    media: "Slide Presentasi, Video YouTube, Lembar Kerja Peserta Didik (LKPD).",
-                    asesmen: "Formatif: Observasi kinerja kelompok. Sumatif: Tes tulis di akhir materi."
-                }
-            });
-            showToast.success('Modul berhasil di-generate!');
-        }, 2000);
-    };
+    const filteredModulList = modulList.filter(m => 
+        m.judul.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     return (
-        <div className="p-4 md:p-8 space-y-8">
-            <PageHero
-                title="Modul Ajar"
-                description="Buat detail pelaksanaan mengajar dari setiap Tujuan Pembelajaran"
-                icon={<FileText className="w-5 h-5" />}
-                breadcrumb="Perencanaan / Modul Ajar"
-                variant="violet"
-            />
+        <div className="flex flex-col md:flex-row h-full md:h-[calc(100vh-120px)] gap-4 md:gap-6 p-2 animate-in fade-in duration-700 relative overflow-hidden">
+            {/* MOBILE TOGGLE OVERLAY */}
+            <AnimatePresence>
+                {showMobileKoleksi && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setShowMobileKoleksi(false)}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] md:hidden"
+                    />
+                )}
+            </AnimatePresence>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                {/* Selector Sidebar */}
-                <div className="lg:col-span-1 space-y-6">
-                    <div className="p-6 rounded-[2rem] bg-zinc-900/50 border border-white/5 backdrop-blur-xl space-y-6">
-                        <div className="space-y-4">
-                            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground pl-1">Pembelajaran</Label>
-                            <SearchableSelect
-                                value={selectedPembelajaran}
-                                onChange={setSelectedPembelajaran}
-                                options={pembelajarans.map(p => ({ value: p.id, label: `${p.rombel_nama} - ${p.mata_pelajaran_nama}` }))}
-                                placeholder="Pilih Kelas & Mapel"
+            <div className={`
+                fixed md:relative inset-y-0 left-0 z-[50] md:z-0
+                w-[280px] md:w-80 
+                transform transition-transform duration-300 ease-in-out
+                ${showMobileKoleksi ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                flex flex-col gap-4 p-4 md:p-0 bg-slate-950 md:bg-transparent
+            `}>
+                <div className="relative group h-full">
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+                    <div className="relative flex flex-col bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-4 h-full overflow-hidden">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-2">
+                                <History className="w-4 h-4 text-violet-400" />
+                                <h3 className="text-sm font-bold text-foreground tracking-tight">Koleksi Modul</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 font-bold">
+                                    {modulList.length}
+                                </span>
+                                <button onClick={() => setShowMobileKoleksi(false)} className="md:hidden p-1 hover:bg-white/10 rounded-lg">
+                                    <X className="w-4 h-4 text-muted-foreground" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="relative mb-4">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                            <input 
+                                type="text"
+                                placeholder="Cari modul..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-9 pr-4 text-xs text-foreground focus:outline-none focus:border-violet-500/50 transition-all"
                             />
                         </div>
-                        {selectedPembelajaran && (
-                            <div className="space-y-4">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground pl-1">Tujuan (TP)</Label>
-                                <SearchableSelect
-                                    value={selectedTP}
-                                    onChange={setSelectedTP}
-                                    options={tpList.map(t => ({ value: t.id, label: `${t.kode} - ${t.deskripsi.substring(0, 40)}...` }))}
-                                    placeholder="Pilih TP"
-                                />
-                            </div>
-                        )}
-                        {selectedTP && (
-                             <Button onClick={handleNewModul} className="w-full h-12 rounded-2xl gap-2 font-black uppercase text-[11px] tracking-widest bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-600/20">
-                                <Plus className="w-4 h-4" /> Buat Modul Baru
-                             </Button>
-                        )}
-                    </div>
 
-                    {/* Modul List for selected TP */}
-                    {selectedTP && (
-                        <div className="p-6 rounded-[2rem] bg-zinc-900/50 border border-white/5 backdrop-blur-xl">
-                            <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground pl-1 mb-4">Modul yang ada</h4>
-                            <div className="space-y-3">
-                                {modulList.map(m => (
-                                    <button 
-                                        key={m.id} 
-                                        onClick={() => setActiveModul(m)}
-                                        className="w-full p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-violet-500/30 text-left transition-all group"
-                                    >
-                                        <h5 className="text-[11px] font-bold text-foreground group-hover:text-violet-400 transition-colors">{m.judul}</h5>
-                                        <div className="flex items-center gap-2 mt-2">
-                                            {m.is_generated_ai && <span className="text-[8px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 font-black uppercase">AI Generated</span>}
-                                            <span className="text-[8px] text-muted-foreground uppercase">{m.id?.substring(0, 8)}</span>
+                        <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                            {filteredModulList.map((m) => (
+                                <button 
+                                    key={m.id}
+                                    onClick={() => { handleSelectModul(m); setShowMobileKoleksi(false); }}
+                                    className={`w-full text-left p-3 rounded-xl border transition-all group relative overflow-hidden ${activeModul?.id === m.id ? 'bg-violet-500/10 border-violet-500/30' : 'bg-white/[0.03] border-white/5 hover:border-violet-500/30'}`}
+                                >
+                                    <div className="relative z-10">
+                                        <h5 className={`text-[11px] font-bold transition-colors line-clamp-2 ${activeModul?.id === m.id ? 'text-violet-400' : 'text-foreground group-hover:text-violet-400'}`}>
+                                            {m.judul}
+                                        </h5>
+                                        <div className="flex items-center justify-between mt-2">
+                                            {m.is_generated_ai && (
+                                                <span className="flex items-center gap-1 text-[8px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 font-black tracking-tighter">
+                                                    <Zap className="w-2 h-2" /> AI
+                                                </span>
+                                            )}
+                                            <button onClick={(e) => handleDelete(e, m.id!)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all">
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
                                         </div>
-                                    </button>
-                                ))}
-                                {modulList.length === 0 && (
-                                    <p className="text-[10px] text-muted-foreground text-center py-4 italic">Belum ada modul untuk TP ini.</p>
-                                )}
-                            </div>
+                                    </div>
+                                </button>
+                            ))}
                         </div>
-                    )}
-                </div>
-
-                {/* Editor Area */}
-                <div className="lg:col-span-3">
-                    <AnimatePresence mode="wait">
-                        {!activeModul ? (
-                             <div className="flex flex-col items-center justify-center py-32 text-center space-y-4 rounded-[3rem] border-2 border-dashed border-white/5 bg-zinc-900/20">
-                                <FileText className="w-12 h-12 text-muted-foreground opacity-20" />
-                                <p className="text-sm text-muted-foreground">Pilih TP dan klik 'Buat Modul Baru' atau pilih modul yang ada.</p>
-                             </div>
-                        ) : (
-                            <motion.div 
-                                initial={{ opacity: 0, scale: 0.98 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                className="space-y-6"
-                            >
-                                <div className="flex flex-col md:flex-row gap-4 items-center justify-between p-6 rounded-[2rem] bg-violet-500/5 border border-violet-500/10">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-violet-600/20 flex items-center justify-center border border-violet-600/30">
-                                            <FileText className="w-6 h-6 text-violet-500" />
-                                        </div>
-                                        <div>
-                                            <Input 
-                                                value={activeModul.judul}
-                                                onChange={(e) => setActiveModul({...activeModul, judul: e.target.value})}
-                                                className="bg-transparent border-none p-0 h-auto font-black text-xl text-foreground focus-visible:ring-0"
-                                            />
-                                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Status: {activeModul.id ? 'Tersimpan' : 'Draft Baru'}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <Button 
-                                            variant="ghost" 
-                                            onClick={generateWithAI}
-                                            className="h-12 rounded-2xl gap-2 font-black uppercase text-[10px] text-violet-400 hover:bg-violet-500/10"
-                                        >
-                                            <Sparkles className="w-4 h-4" /> Generate AI
-                                        </Button>
-                                        <Button onClick={handleSave} loading={saving} className="h-12 px-8 rounded-2xl gap-2 font-black uppercase text-[11px] tracking-widest bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-600/20">
-                                            <Save className="w-4 h-4" /> Simpan Modul
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Left: General Info */}
-                                    <div className="space-y-6">
-                                        <div className="p-6 rounded-[2.5rem] bg-zinc-900/40 border border-white/5 space-y-4">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Target className="w-4 h-4 text-violet-400" />
-                                                <h4 className="text-xs font-black uppercase tracking-widest text-foreground">Tujuan (TP)</h4>
-                                            </div>
-                                            <p className="text-sm text-muted-foreground leading-relaxed italic border-l-2 border-violet-500/30 pl-4">
-                                                {activeModul.konten_json.tujuan || 'Belum ada tujuan terdefinisi.'}
-                                            </p>
-                                        </div>
-
-                                        <div className="p-6 rounded-[2.5rem] bg-zinc-900/40 border border-white/5 space-y-4">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Layout className="w-4 h-4 text-violet-400" />
-                                                <h4 className="text-xs font-black uppercase tracking-widest text-foreground">Media & Sarana</h4>
-                                            </div>
-                                            <textarea 
-                                                value={activeModul.konten_json.media}
-                                                onChange={(e) => setActiveModul({...activeModul, konten_json: {...activeModul.konten_json, media: e.target.value}})}
-                                                placeholder="Sebutkan media yang digunakan..."
-                                                className="w-full min-h-[100px] bg-transparent border-none p-0 text-sm text-muted-foreground focus:ring-0 outline-none resize-none"
-                                            />
-                                        </div>
-
-                                        <div className="p-6 rounded-[2.5rem] bg-zinc-900/40 border border-white/5 space-y-4">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <List className="w-4 h-4 text-violet-400" />
-                                                <h4 className="text-xs font-black uppercase tracking-widest text-foreground">Asesmen</h4>
-                                            </div>
-                                            <textarea 
-                                                value={activeModul.konten_json.asesmen}
-                                                onChange={(e) => setActiveModul({...activeModul, konten_json: {...activeModul.konten_json, asesmen: e.target.value}})}
-                                                placeholder="Jelaskan metode asesmen..."
-                                                className="w-full min-h-[100px] bg-transparent border-none p-0 text-sm text-muted-foreground focus:ring-0 outline-none resize-none"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Right: Main Steps */}
-                                    <div className="p-8 rounded-[3rem] bg-zinc-900/40 border border-white/5 space-y-6">
-                                        <div className="flex items-center gap-2 mb-4">
-                                            <Type className="w-4 h-4 text-violet-400" />
-                                            <h4 className="text-xs font-black uppercase tracking-widest text-foreground">Langkah Pembelajaran (Skenario)</h4>
-                                        </div>
-                                        <textarea 
-                                            value={activeModul.konten_json.langkah_pembelajaran}
-                                            onChange={(e) => setActiveModul({...activeModul, konten_json: {...activeModul.konten_json, langkah_pembelajaran: e.target.value}})}
-                                            placeholder="Tuliskan skenario mengajar di sini..."
-                                            className="w-full min-h-[450px] bg-transparent border-none p-0 text-sm text-muted-foreground focus:ring-0 outline-none resize-none leading-loose"
-                                        />
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                    </div>
                 </div>
             </div>
+
+            <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+                <div className="bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-2xl p-3 md:p-4">
+                    <div className="flex flex-wrap items-center gap-3 md:gap-4">
+                        <button onClick={() => setShowMobileKoleksi(true)} className="md:hidden p-2 bg-white/5 rounded-xl border border-white/10 text-violet-400">
+                            <Menu className="w-5 h-5" />
+                        </button>
+                        
+                        <div className="flex-1 min-w-[200px]">
+                            <SearchableSelect
+                                options={mapels.map(m => ({ value: m.id, label: m.nama }))}
+                                value={selectedMapel}
+                                onChange={setSelectedMapel}
+                                placeholder="Pilih Mapel"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl border border-white/10 min-w-[110px] flex-1 md:flex-none">
+                            <Filter className="w-4 h-4 text-violet-400" />
+                            <select 
+                                className="bg-transparent border-none text-xs font-bold focus:ring-0 w-full"
+                                value={selectedFase}
+                                onChange={(e) => setSelectedFase(e.target.value)}
+                                disabled={!selectedMapel}
+                            >
+                                <option value="" disabled>Fase</option>
+                                {mapels.find(m => m.id === selectedMapel)?.phases.map((f: string) => (
+                                    <option key={f} value={f}>{f}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="w-full lg:max-w-xs order-last lg:order-none">
+                            <SearchableSelect
+                                options={tpList.map(tp => ({ value: tp.id, label: `[${tp.kode}] ${tp.deskripsi}` }))}
+                                value={selectedTP}
+                                onChange={setSelectedTP}
+                                placeholder="Pilih TP"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-2 ml-auto">
+                                <Button onClick={handleNewModul} disabled={!selectedTP} variant="outline" className="h-10 border-white/10 bg-white/5 text-xs gap-2">
+                                    <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Baru</span>
+                                </Button>
+                                <Button onClick={handleGenerateAI} disabled={!selectedTP || isGenerating} className="h-10 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs gap-2 shadow-lg shadow-violet-500/20">
+                                    <Sparkles className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                                    {isGenerating ? 'AI Processing...' : 'Generate AI'}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                {/* EDITOR AREA */}
+                {activeModul ? (
+                    <div className="flex-1 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden flex flex-col relative group/editor shadow-2xl">
+                        <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/5 bg-white/[0.02]">
+                            <div className="flex-1">
+                                <input 
+                                    type="text"
+                                    value={activeModul.judul}
+                                    onChange={(e) => setActiveModul({...activeModul, judul: e.target.value})}
+                                    className="w-full bg-transparent border-none p-0 text-xl font-black text-foreground focus:ring-0 placeholder:text-muted-foreground/30"
+                                    placeholder="Judul Modul Ajar..."
+                                />
+                                {activeModul.is_generated_ai && (
+                                    <p className="text-[10px] text-violet-400 font-black tracking-widest uppercase flex items-center gap-1.5 mt-1">
+                                        <Zap className="w-2.5 h-2.5" /> Hasil Optimasi AI
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="hidden md:flex bg-white/5 border-white/10 hover:bg-white/10 rounded-xl h-10 px-4"
+                                >
+                                    <Download className="w-4 h-4 mr-2" /> Export
+                                </Button>
+                                <Button 
+                                    onClick={handleSave}
+                                    disabled={isSaving}
+                                    className="bg-violet-600 hover:bg-violet-500 rounded-xl h-10 px-6 font-bold shadow-lg shadow-violet-500/20"
+                                >
+                                    {isSaving ? 'Menyimpan...' : (
+                                        <>
+                                            <Save className="w-4 h-4 mr-2" /> <span className="hidden sm:inline">Simpan</span>
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
+                            {/* Section 1: Informasi Umum */}
+                            <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+                                <label className="text-[11px] font-black text-violet-400/80 uppercase tracking-[0.2em] flex items-center gap-3">
+                                    <div className="w-8 h-[1px] bg-violet-400/30" />
+                                    1. Informasi Umum (Identitas, P5, Sarana)
+                                </label>
+                                <div className="relative">
+                                    <BookOpen className="absolute left-4 top-4 w-4 h-4 text-muted-foreground/30" />
+                                    <textarea 
+                                        value={activeModul.media}
+                                        onChange={(e) => setActiveModul({...activeModul, media: e.target.value})}
+                                        className="w-full min-h-[160px] bg-white/[0.03] border border-white/5 hover:border-white/10 focus:border-violet-500/30 rounded-2xl p-6 pl-12 text-sm text-foreground/90 focus:outline-none transition-all leading-relaxed shadow-inner"
+                                        placeholder="Tuliskan identitas modul, dimensi Profil Pelajar Pancasila, sarana prasarana, target peserta didik, dan model pembelajaran di sini..."
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Section 2: Komponen Inti */}
+                            <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-700">
+                                <label className="text-[11px] font-black text-violet-400/80 uppercase tracking-[0.2em] flex items-center gap-3">
+                                    <div className="w-8 h-[1px] bg-violet-400/30" />
+                                    2. Komponen Inti (Tujuan, Langkah, Asesmen)
+                                </label>
+                                <div className="relative">
+                                    <List className="absolute left-4 top-4 w-4 h-4 text-muted-foreground/30" />
+                                    <textarea 
+                                        value={activeModul.langkah_pembelajaran}
+                                        onChange={(e) => setActiveModul({...activeModul, langkah_pembelajaran: e.target.value})}
+                                        className="w-full min-h-[350px] bg-white/[0.03] border border-white/5 hover:border-white/10 focus:border-violet-500/30 rounded-2xl p-6 pl-12 text-sm text-foreground/90 focus:outline-none transition-all leading-relaxed shadow-inner"
+                                        placeholder="Tuliskan tujuan pembelajaran, pemahaman bermakna, pertanyaan pemantik, langkah-langkah pembelajaran detail (Pendahuluan, Inti, Penutup), dan asesmen di sini..."
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Section 3: Lampiran */}
+                            <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-1000">
+                                <label className="text-[11px] font-black text-violet-400/80 uppercase tracking-[0.2em] flex items-center gap-3">
+                                    <div className="w-8 h-[1px] bg-violet-400/30" />
+                                    3. Lampiran (LKPD, Glosarium, Pustaka)
+                                </label>
+                                <div className="relative">
+                                    <Target className="absolute left-4 top-4 w-4 h-4 text-muted-foreground/30" />
+                                    <textarea 
+                                        value={activeModul.asesmen}
+                                        onChange={(e) => setActiveModul({...activeModul, asesmen: e.target.value})}
+                                        className="w-full min-h-[160px] bg-white/[0.03] border border-white/5 hover:border-white/10 focus:border-violet-500/30 rounded-2xl p-6 pl-12 text-sm text-foreground/90 focus:outline-none transition-all leading-relaxed shadow-inner"
+                                        placeholder="Tuliskan Lembar Kerja Peserta Didik (LKPD), bahan bacaan guru & siswa, glosarium, dan daftar pustaka di sini..."
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center bg-slate-900/50 backdrop-blur-xl border border-dashed border-white/10 rounded-3xl p-12 text-center group">
+                        <div className="w-24 h-24 rounded-full bg-violet-500/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
+                            <Zap className="w-10 h-10 text-violet-400/20" />
+                        </div>
+                        <h4 className="text-lg font-bold text-foreground mb-2">Pilih atau Buat Modul Ajar</h4>
+                        <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+                            Pilih modul dari koleksi di sebelah kiri untuk mengedit, atau gunakan bantuan AI untuk menyusun modul ajar baru secara otomatis dalam hitungan detik.
+                        </p>
+                        <div className="flex items-center gap-4 mt-8 opacity-50">
+                            <div className="flex flex-col items-center gap-1">
+                                <div className="p-3 rounded-xl bg-white/5"><History className="w-4 h-4" /></div>
+                                <span className="text-[10px] font-bold">History</span>
+                            </div>
+                            <div className="w-8 h-[1px] bg-white/10" />
+                            <div className="flex flex-col items-center gap-1">
+                                <div className="p-3 rounded-xl bg-white/5"><Sparkles className="w-4 h-4" /></div>
+                                <span className="text-[10px] font-bold">AI Power</span>
+                            </div>
+                            <div className="w-8 h-[1px] bg-white/10" />
+                            <div className="flex flex-col items-center gap-1">
+                                <div className="p-3 rounded-xl bg-white/5"><Save className="w-4 h-4" /></div>
+                                <span className="text-[10px] font-bold">Cloud Save</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <style dangerouslySetInnerHTML={{ __html: `
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: rgba(139, 92, 246, 0.1);
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: rgba(139, 92, 246, 0.3);
+                }
+            `}} />
         </div>
     );
-}
+};
+
+export default ModulAjarPage;

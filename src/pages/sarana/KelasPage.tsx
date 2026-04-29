@@ -34,6 +34,7 @@ interface Rombel {
   tahun_ajaran_id: string;
   nama: string;
   tingkat: number;
+  fase: string;
   wali_kelas_ptk_id?: string;
   wali_kelas_nama?: string;
   tahun_ajaran_nama?: string;
@@ -49,6 +50,7 @@ interface RombelStats {
 const EMPTY_FORM = {
   nama: '',
   tingkat: 1,
+  fase: '',
   tahun_ajaran_id: '',
   wali_kelas_ptk_id: ''
 };
@@ -159,6 +161,7 @@ export default function KelasPage() {
       ).map((r: Rombel) => ({
         'Nama Kelas': r.nama,
         'Tingkat': r.tingkat,
+        'Fase': r.fase,
         'Wali Kelas': r.wali_kelas_nama || 'Belum ditentukan',
         'Tahun Ajaran': r.tahun_ajaran_nama
       }));
@@ -188,6 +191,7 @@ export default function KelasPage() {
     setForm({
       nama: r.nama,
       tingkat: r.tingkat,
+      fase: r.fase || '',
       tahun_ajaran_id: r.tahun_ajaran_id,
       wali_kelas_ptk_id: r.wali_kelas_ptk_id || ''
     });
@@ -277,7 +281,10 @@ export default function KelasPage() {
       header: 'Nama Kelas', accessor: 'nama' as keyof Rombel, render: (r: Rombel) => (
         <Link to={`/kelas/${r.id}`} className="flex flex-col group/name">
           <span className="font-bold text-foreground group-hover/name:text-primary transition-colors">{r.nama}</span>
-          <span className="text-[10px] text-muted-foreground uppercase tracking-tight">Tingkat {r.tingkat}</span>
+          <div className="flex gap-2">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-tight font-bold">Tingkat {r.tingkat}</span>
+            <span className="text-[10px] text-primary/70 uppercase tracking-tight font-bold">Fase {r.fase}</span>
+          </div>
         </Link>
       )
     },
@@ -384,8 +391,22 @@ export default function KelasPage() {
 
             <div className="space-y-4">
               <FormField id="nama" label="Nama Kelas" placeholder="e.g. VII-A" value={form.nama} onChange={v => setForm(f => ({ ...f, nama: v }))} required />
-              <FormField id="tingkat" label="Tingkat" type="select" value={form.tingkat} onChange={v => setForm(f => ({ ...f, tingkat: Number(v) }))}
+              <FormField id="tingkat" label="Tingkat" type="select" value={form.tingkat} 
+                onChange={v => {
+                  const tingkat = Number(v);
+                  let fase = '';
+                  if (tingkat >= 1 && tingkat <= 2) fase = 'A';
+                  else if (tingkat >= 3 && tingkat <= 4) fase = 'B';
+                  else if (tingkat >= 5 && tingkat <= 6) fase = 'C';
+                  else if (tingkat >= 7 && tingkat <= 9) fase = 'D';
+                  else if (tingkat === 10) fase = 'E';
+                  else if (tingkat >= 11 && tingkat <= 12) fase = 'F';
+                  setForm(f => ({ ...f, tingkat, fase }));
+                }}
                 options={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(t => ({ value: t, label: `Tingkat ${t}` }))} required />
+
+              <FormField id="fase" label="Fase" type="select" value={form.fase} onChange={v => setForm(f => ({ ...f, fase: v }))}
+                options={['A', 'B', 'C', 'D', 'E', 'F'].map(f => ({ value: f, label: `Fase ${f}` }))} required />
 
               <FormField id="tahun_ajaran_id" label="Tahun Ajaran" type="select" placeholder="-- Pilih Tahun Ajaran --" value={form.tahun_ajaran_id} onChange={v => setForm(f => ({ ...f, tahun_ajaran_id: v }))}
                 options={tahunAjarans.map(t => ({ value: t.id, label: t.tahun + (t.aktif ? ' (Aktif)' : '') }))} required />
@@ -399,61 +420,6 @@ export default function KelasPage() {
                 options={ptks.map(p => ({ value: p.id, label: p.nama }))} 
               />
             </div>
-          </div>
-        </Modal>
-      )}
-
-      {importModalOpen && (
-        <Modal
-          title="Import Data Kelas"
-          description="Pilih tahun ajaran tujuan untuk data yang akan diimpor"
-          icon={<Upload className="w-5 h-5" />}
-          onClose={() => setImportModalOpen(false)}
-          showFooter={false}
-          maxWidth="sm"
-        >
-          <div className="space-y-6">
-            <FormField 
-              id="import_tahun_ajaran" 
-              label="Tahun Ajaran Tujuan" 
-              type="select" 
-              value={importTahunAjaranId} 
-              onChange={setImportTahunAjaranId}
-              options={tahunAjarans.map(t => ({ value: t.id, label: t.tahun + (t.aktif ? ' (Aktif)' : '') }))}
-              required
-            />
-            
-            <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-3">
-              <div className="flex items-center gap-2 text-primary">
-                <Calendar className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-wider">Instruksi Impor</span>
-              </div>
-              <ul className="text-[11px] text-muted-foreground space-y-1 list-disc pl-4 font-medium">
-                <li>Pastikan file Excel memiliki kolom <strong>Nama</strong> dan <strong>Tingkat</strong>.</li>
-                <li>Data akan dimasukkan ke dalam Tahun Ajaran yang Anda pilih di atas.</li>
-                <li>Wali Kelas dapat diatur secara manual setelah data berhasil diimpor.</li>
-              </ul>
-            </div>
-
-            <Button 
-              className="w-full gap-2 h-12 text-sm font-bold shadow-lg shadow-primary/20" 
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing || !importTahunAjaranId}
-            >
-              {importing ? (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Upload className="w-4 h-4" />
-              )}
-              {importing ? 'Memproses...' : 'Pilih File & Impor Sekarang'}
-            </Button>
-            <input 
-              type="file" 
-              ref={fileInputRef}
-              accept=".xlsx, .xls" 
-              className="hidden" 
-              onChange={handleImport} 
-            />
           </div>
         </Modal>
       )}
@@ -475,7 +441,8 @@ export default function KelasPage() {
               placeholder="-- Pilih Tahun Ajaran --"
               value={importTahunAjaranId}
               onChange={setImportTahunAjaranId}
-              options={tahunAjarans.map(t => ({ value: t.id, label: t.tahun }))}
+              options={tahunAjarans.map(t => ({ value: t.id, label: t.tahun + (t.aktif ? ' (Aktif)' : '') }))}
+              required
             />
 
             <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-3">
@@ -485,7 +452,7 @@ export default function KelasPage() {
               </div>
               <ul className="text-[11px] text-muted-foreground space-y-1 list-disc pl-4">
                 <li>Gunakan template Excel yang tersedia di bawah.</li>
-                <li>Kolom <strong>Nama</strong> dan <strong>Tingkat</strong> (Angka) wajib ada.</li>
+                <li>Kolom <strong>Nama</strong>, <strong>Tingkat</strong>, dan <strong>Fase</strong> wajib ada.</li>
                 <li>Pilih tahun ajaran sebelum mengunggah file.</li>
               </ul>
             </div>
@@ -504,14 +471,16 @@ export default function KelasPage() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importing || !importTahunAjaranId}
               >
-                {importing ? (
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Upload className="w-4 h-4" />
-                )}
                 {importing ? 'Memproses...' : 'PILIH FILE EXCEL'}
               </Button>
             </div>
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              accept=".xlsx, .xls" 
+              className="hidden" 
+              onChange={handleImport} 
+            />
           </div>
         </Modal>
       )}

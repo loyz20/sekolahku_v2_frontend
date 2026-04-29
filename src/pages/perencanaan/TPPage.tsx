@@ -38,14 +38,9 @@ interface TP {
     urutan: number;
     cp_deskripsi?: string;
     fase?: string;
+    mapel_id?: string;
 }
 
-interface Pembelajaran {
-    id: string;
-    mata_pelajaran_id: string;
-    mata_pelajaran_nama: string;
-    rombel_nama: string;
-}
 
 interface AIGeneratedTP {
     kode: string;
@@ -54,8 +49,9 @@ interface AIGeneratedTP {
 }
 
 export default function TPPage() {
-    const [pembelajarans, setPembelajarans] = useState<Pembelajaran[]>([]);
-    const [selectedPembelajaran, setSelectedPembelajaran] = useState('');
+    const [mapels, setMapels] = useState<any[]>([]);
+    const [selectedMapel, setSelectedMapel] = useState('');
+    const [selectedFase, setSelectedFase] = useState('');
     const [tpList, setTpList] = useState<TP[]>([]);
     const [cpList, setCpList] = useState<CP[]>([]);
     const [loading, setLoading] = useState(false);
@@ -67,6 +63,8 @@ export default function TPPage() {
     const [editingTP, setEditingTP] = useState<TP | null>(null);
     const [formData, setFormData] = useState({
         cp_id: '',
+        mapel_id: '',
+        fase: '',
         kode: '',
         deskripsi: '',
         urutan: 0
@@ -78,52 +76,70 @@ export default function TPPage() {
     const [aiResults, setAiResults] = useState<AIGeneratedTP[]>([]);
     const [selectedCPForAI, setSelectedCPForAI] = useState('');
 
-    const fetchPembelajaran = async () => {
+    const fetchMapel = async () => {
         try {
+            // Fetch from pembelajaran to get only subjects taught by the teacher
             const res = await api.get<any>('/pembelajaran?limit=100');
-            setPembelajarans(res.data.items || []);
+            const items = res.data.items || [];
+            
+            // Extract unique subjects
+            const uniqueMapels = Array.from(new Map(items.map((item: any) => [
+                item.mata_pelajaran_id, 
+                { id: item.mata_pelajaran_id, nama: item.mata_pelajaran_nama, phases: [] as string[] }
+            ])).values()) as { id: string, nama: string, phases: string[] }[];
+
+            // Add available phases for each mapel
+            items.forEach((item: any) => {
+                const mapel = uniqueMapels.find(m => m.id === item.mata_pelajaran_id);
+                if (mapel && item.fase && !mapel.phases.includes(item.fase)) {
+                    mapel.phases.push(item.fase);
+                }
+            });
+
+            setMapels(uniqueMapels);
         } catch (error) {
-            showToast.error('Gagal mengambil data pembelajaran');
+            showToast.error('Gagal mengambil data mata pelajaran mengajar');
         }
     };
 
     const fetchTP = useCallback(async () => {
-        if (!selectedPembelajaran) return;
+        if (!selectedMapel || !selectedFase) return;
+
         setLoading(true);
         try {
-            const res = await api.get<any>(`/perencanaan/tp?pembelajaran_id=${selectedPembelajaran}`);
+            // Fetch TP by Mapel and Fase
+            const res = await api.get<any>(`/perencanaan/tp?mapel_id=${selectedMapel}&fase=${selectedFase}`);
             setTpList(res.data || []);
         } catch (error) {
             showToast.error('Gagal mengambil data TP');
         } finally {
             setLoading(false);
         }
-    }, [selectedPembelajaran]);
+    }, [selectedMapel, selectedFase]);
 
     const fetchCP = useCallback(async () => {
-        const current = pembelajarans.find(p => p.id === selectedPembelajaran);
-        if (!current) return;
+        if (!selectedMapel || !selectedFase) return;
         try {
-            const res = await api.get<any>(`/perencanaan/cp?mapel_id=${current.mata_pelajaran_id}`);
+            const res = await api.get<any>(`/perencanaan/cp?mapel_id=${selectedMapel}&fase=${selectedFase}`);
             setCpList(res.data || []);
         } catch (error) {
             console.error('Failed to fetch CP', error);
         }
-    }, [selectedPembelajaran, pembelajarans]);
+    }, [selectedMapel, selectedFase]);
 
     useEffect(() => {
-        fetchPembelajaran();
+        fetchMapel();
     }, []);
 
     useEffect(() => {
-        if (selectedPembelajaran) {
+        if (selectedMapel && selectedFase) {
             fetchTP();
             fetchCP();
         } else {
             setTpList([]);
             setCpList([]);
         }
-    }, [selectedPembelajaran, fetchTP, fetchCP]);
+    }, [selectedMapel, selectedFase, fetchTP, fetchCP]);
 
     const handleSubmit = async () => {
         if (!formData.cp_id || !formData.kode || !formData.deskripsi) {
@@ -137,7 +153,7 @@ export default function TPPage() {
                 await api.put(`/perencanaan/tp/${editingTP.id}`, formData);
                 showToast.success('Tujuan Pembelajaran berhasil diperbarui');
             } else {
-                await api.post('/perencanaan/tp', { ...formData, pembelajaran_id: selectedPembelajaran });
+                await api.post('/perencanaan/tp', formData);
                 showToast.success('Tujuan Pembelajaran berhasil ditambahkan');
             }
             setIsModalOpen(false);
@@ -167,14 +183,14 @@ export default function TPPage() {
         }
 
         const cp = cpList.find(c => c.id === selectedCPForAI);
-        const mapel = pembelajarans.find(p => p.id === selectedPembelajaran);
+        const mapel = mapels.find(p => p.id === selectedMapel);
         
         setGenerating(true);
         try {
             const res = await api.post<any>('/perencanaan/tp/generate', {
                 cp: cp?.deskripsi,
                 fase: cp?.fase,
-                mapel: mapel?.mata_pelajaran_nama
+                mapel: mapel?.nama
             });
             
             const results = (res.data || []).map((t: any) => ({
@@ -195,14 +211,14 @@ export default function TPPage() {
             showToast.error('Pilih minimal satu TP untuk disimpan');
             return;
         }
-
         setSaving(true);
         try {
-            // Save one by one (or you could implement bulk save in backend)
+            const selectedCP = cpList.find(c => c.id === selectedCPForAI);
             for (const item of toSave) {
                 await api.post('/perencanaan/tp', {
-                    pembelajaran_id: selectedPembelajaran,
                     cp_id: selectedCPForAI,
+                    mapel_id: selectedCP?.mapel_id,
+                    fase: selectedCP?.fase,
                     kode: item.kode,
                     deskripsi: item.deskripsi,
                     urutan: 0
@@ -222,6 +238,8 @@ export default function TPPage() {
         setEditingTP(tp);
         setFormData({
             cp_id: tp.cp_id,
+            mapel_id: tp.mapel_id || '',
+            fase: tp.fase || '',
             kode: tp.kode,
             deskripsi: tp.deskripsi,
             urutan: tp.urutan
@@ -280,27 +298,53 @@ export default function TPPage() {
                 {/* Selection Sidebar */}
                 <div className="lg:col-span-1 space-y-6 p-6 rounded-[2rem] bg-zinc-900/50 border border-white/5 backdrop-blur-xl">
                     <div className="space-y-4">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 pl-1">Seleksi Pembelajaran</Label>
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 pl-1">Mata Pelajaran</Label>
                         <SearchableSelect
-                            value={selectedPembelajaran}
-                            onChange={setSelectedPembelajaran}
-                            options={pembelajarans.map(p => ({
-                                value: p.id,
-                                label: `${p.rombel_nama} - ${p.mata_pelajaran_nama}`
+                            value={selectedMapel}
+                            onChange={setSelectedMapel}
+                            options={mapels.map(m => ({
+                                value: m.id,
+                                label: m.nama
                             }))}
-                            placeholder="Pilih Kelas & Mapel"
+                            placeholder="Pilih Mapel"
                         />
                     </div>
 
-                    {selectedPembelajaran && (
+                    <div className="space-y-4">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 pl-1">Fase</Label>
+                        <SearchableSelect
+                            value={selectedFase}
+                            onChange={setSelectedFase}
+                            options={(mapels.find(m => m.id === selectedMapel)?.phases || ['A', 'B', 'C', 'D', 'E', 'F']).map((f: string) => ({
+                                value: f,
+                                label: `Fase ${f}`
+                            }))}
+                            placeholder="Pilih Fase"
+                        />
+                    </div>
+
+                    {selectedMapel && selectedFase && (
                         <div className="pt-4 border-t border-white/5 space-y-4">
                             <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
-                                <p className="text-[10px] font-bold text-primary uppercase mb-1">Status TP</p>
+                                <p className="text-[10px] font-bold text-primary uppercase mb-1">
+                                    Status TP Fase {selectedFase}
+                                </p>
                                 <p className="text-2xl font-black">{tpList.length}</p>
-                                <p className="text-[10px] text-muted-foreground">Tujuan dirumuskan</p>
+                                <p className="text-[10px] text-muted-foreground">Tujuan dirumuskan secara kolektif</p>
                             </div>
                             <div className="grid grid-cols-1 gap-2">
-                                <Button onClick={() => { setEditingTP(null); setFormData({ cp_id: '', kode: '', deskripsi: '', urutan: 0 }); setIsModalOpen(true); }} className="w-full h-12 rounded-2xl gap-2 font-black uppercase text-[11px] tracking-widest shadow-lg shadow-primary/20">
+                                <Button onClick={() => { 
+                                    setEditingTP(null); 
+                                    setFormData({ 
+                                        cp_id: '', 
+                                        mapel_id: selectedMapel, 
+                                        fase: selectedFase, 
+                                        kode: '', 
+                                        deskripsi: '', 
+                                        urutan: 0 
+                                    }); 
+                                    setIsModalOpen(true); 
+                                }} className="w-full h-12 rounded-2xl gap-2 font-black uppercase text-[11px] tracking-widest shadow-lg shadow-primary/20">
                                     <Plus className="w-4 h-4" /> Tambah TP
                                 </Button>
                                 <Button 
@@ -318,7 +362,7 @@ export default function TPPage() {
                 {/* Main Content */}
                 <div className="lg:col-span-3">
                     <AnimatePresence mode="wait">
-                        {!selectedPembelajaran ? (
+                        {!selectedMapel || !selectedFase ? (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -328,8 +372,8 @@ export default function TPPage() {
                                     <BookOpen className="w-8 h-8" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-foreground">Pilih Pembelajaran</h3>
-                                    <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">Silakan pilih mata pelajaran dan kelas untuk mengelola Tujuan Pembelajaran.</p>
+                                    <h3 className="font-bold text-foreground">Pilih Mapel & Fase</h3>
+                                    <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">Silakan pilih mata pelajaran dan fase untuk mengelola Tujuan Pembelajaran.</p>
                                 </div>
                             </motion.div>
                         ) : (
@@ -384,7 +428,15 @@ export default function TPPage() {
                             <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground pl-1">Pilih Capaian Pembelajaran (CP)</Label>
                             <SearchableSelect
                                 value={formData.cp_id}
-                                onChange={(v) => setFormData({ ...formData, cp_id: v })}
+                                onChange={(v) => {
+                                    const selectedCP = cpList.find(c => c.id === v);
+                                    setFormData({ 
+                                        ...formData, 
+                                        cp_id: v, 
+                                        mapel_id: selectedCP?.mapel_id || '',
+                                        fase: selectedCP?.fase || ''
+                                    });
+                                }}
                                 options={cpList.map(c => ({
                                     value: c.id,
                                     label: `Fase ${c.fase}: ${c.deskripsi.substring(0, 80)}...`
