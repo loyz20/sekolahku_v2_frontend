@@ -11,11 +11,22 @@ import {
     AlertCircle,
     XCircle,
     SortAsc,
-    SortDesc
+    SortDesc,
+    Eye,
+    Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/shared/DataTable';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Modal } from '@/components/shared/Modal';
+import { FormField } from '@/components/shared/FormField';
+import { showToast } from '@/lib/toast-utils';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 const MONTHS = [
     { value: '1', label: 'Januari' },
@@ -32,7 +43,7 @@ const MONTHS = [
     { value: '12', label: 'Desember' },
 ];
 
-export default function WaliPresensiPage() {
+export default function WaliAbsensiPage() {
     const [recap, setRecap] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [month, setMonth] = useState(new Date().getMonth() + 1 + '');
@@ -41,6 +52,16 @@ export default function WaliPresensiPage() {
     // Sorting State
     const [sortField, setSortField] = useState('nama');
     const [sortDirection, setSortDirection] = useState<'ASC' | 'DESC'>('ASC');
+
+    // Attendance Modal State
+    const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+    const [reportingStudent, setReportingStudent] = useState<any>(null);
+    const [saving, setSaving] = useState(false);
+    const [attendanceData, setAttendanceData] = useState({
+        status: 'Izin',
+        tanggal: new Date().toISOString().split('T')[0],
+        catatan: ''
+    });
 
     const fetchRecap = async () => {
         setLoading(true);
@@ -98,14 +119,42 @@ export default function WaliPresensiPage() {
         }
     };
 
+    const handleAttendance = (student: any) => {
+        setReportingStudent(student);
+        setIsAttendanceModalOpen(true);
+        setAttendanceData({
+            status: 'Izin',
+            tanggal: new Date().toISOString().split('T')[0],
+            catatan: ''
+        });
+    };
+
+    const submitAttendance = async () => {
+        setSaving(true);
+        try {
+            await api.post('/wali-kelas/attendance', {
+                peserta_didik_id: reportingStudent.id,
+                ...attendanceData
+            });
+            showToast.success('Absensi berhasil diperbarui');
+            setIsAttendanceModalOpen(false);
+            fetchRecap(); // Refresh recap data
+        } catch (e) {
+            console.error(e);
+            showToast.error('Gagal memperbarui absensi');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <div className="w-full p-4 md:p-6 space-y-6 md:space-y-8 mx-auto animate-in fade-in duration-700 relative">
             <PageHero
-                title="Rekap Presensi Kelas"
+                title="Rekap Absensi Kelas"
                 description="Laporan akumulasi kehadiran siswa per bulan"
                 icon={<ClipboardCheck className="w-5 h-5" />}
                 variant="emerald"
-                breadcrumb="Wali Kelas / Presensi"
+                breadcrumb="Wali Kelas / Absensi"
             />
 
             <div className="flex flex-col lg:flex-row gap-6 items-start">
@@ -292,6 +341,29 @@ export default function WaliPresensiPage() {
                                             </div>
                                         );
                                     }
+                                },
+                                {
+                                    header: 'Aksi',
+                                    align: 'right',
+                                    render: (item) => (
+                                        <div className="flex items-center justify-end gap-2">
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            className="h-8 w-8 p-0 rounded-lg hover:bg-white/5"
+                                                            onClick={() => handleAttendance(item)}
+                                                        >
+                                                            <Plus className="w-4 h-4 text-emerald-400" />
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="bg-zinc-900 border-white/10 text-white font-bold">Catat Absen</TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </div>
+                                    )
                                 }
                             ]}
                             hideHeader
@@ -346,6 +418,17 @@ export default function WaliPresensiPage() {
                                             </div>
                                         </div>
 
+                                        <div className="flex gap-2">
+                                            <Button 
+                                                variant="outline" 
+                                                className="flex-1 h-10 rounded-xl border-white/5 bg-white/3 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest gap-2"
+                                                onClick={() => handleAttendance(item)}
+                                            >
+                                                <Plus className="w-3 h-3 text-emerald-400" />
+                                                Catat Absen
+                                            </Button>
+                                        </div>
+
                                         <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
                                             <div
                                                 className={`h-full transition-all duration-1000 ${percent >= 90 ? 'bg-emerald-500' : percent >= 75 ? 'bg-amber-500' : 'bg-rose-500'}`}
@@ -359,6 +442,64 @@ export default function WaliPresensiPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Attendance Modal */}
+            {isAttendanceModalOpen && reportingStudent && (
+                <Modal
+                    isOpen={isAttendanceModalOpen}
+                    title="Catat Absensi Manual"
+                    onClose={() => setIsAttendanceModalOpen(false)}
+                    onSubmit={submitAttendance}
+                    submitLabel="Simpan Absensi"
+                    saving={saving}
+                >
+                    <div className="space-y-6">
+                        <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                                <ClipboardCheck className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-emerald-500/50 uppercase tracking-widest">Siswa</p>
+                                <h4 className="font-black text-foreground uppercase">{reportingStudent.nama}</h4>
+                                <p className="text-[10px] font-bold text-muted-foreground">NIS: {reportingStudent.nis}</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Status Absensi</label>
+                                <Select value={attendanceData.status} onValueChange={(val) => setAttendanceData({ ...attendanceData, status: val })}>
+                                    <SelectTrigger className="h-12 rounded-xl bg-white/5 border-white/10">
+                                        <SelectValue placeholder="Pilih Status" />
+                                    </SelectTrigger>
+                                    <SelectContent position="popper" className="rounded-xl border-white/10 bg-zinc-900 shadow-2xl z-[10001]">
+                                        <SelectItem value="Izin" className="rounded-lg">Izin</SelectItem>
+                                        <SelectItem value="Sakit" className="rounded-lg">Sakit</SelectItem>
+                                        <SelectItem value="Alpa" className="rounded-lg">Alpa (Tanpa Keterangan)</SelectItem>
+                                        <SelectItem value="Valid" className="rounded-lg text-emerald-400">Hadir (Manual)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <FormField 
+                                id="att_tanggal" 
+                                label="Tanggal Absensi" 
+                                type="date"
+                                value={attendanceData.tanggal}
+                                onChange={(val) => setAttendanceData({...attendanceData, tanggal: val})}
+                            />
+                        </div>
+
+                        <FormField 
+                            id="att_catatan" 
+                            label="Catatan / Alasan" 
+                            placeholder="Contoh: Surat dokter terlampir..."
+                            value={attendanceData.catatan}
+                            onChange={(val) => setAttendanceData({...attendanceData, catatan: val})}
+                            isTextArea
+                        />
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 }

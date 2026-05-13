@@ -66,22 +66,35 @@ export default function ATPPage() {
 
     const fetchMapel = async () => {
         try {
-            const res = await api.get<any>('/pembelajaran?limit=100');
-            const items = res.data.items || [];
+            const resMapel = await api.get<any>('/pembelajaran?limit=100');
+            const items = resMapel.data.items || [];
             
-            // Ekstraksi mapel unik
+            // Ekstraksi mapel unik dari pembelajaran
             const uniqueMapels = Array.from(new Map(items.map((item: any) => [
                 item.mata_pelajaran_id, 
                 { id: item.mata_pelajaran_id, nama: item.mata_pelajaran_nama, phases: [] as string[] }
             ])).values()) as Subject[];
 
-            // Masukkan fase yang tersedia untuk tiap mapel
-            items.forEach((item: any) => {
-                const mapel = uniqueMapels.find(m => m.id === item.mata_pelajaran_id);
-                if (mapel && item.fase && !mapel.phases.includes(item.fase)) {
-                    mapel.phases.push(item.fase);
+            // Fetch TP untuk setiap mapel untuk mendapatkan fase
+            for (const mapel of uniqueMapels) {
+                try {
+                    const resTP = await api.get<any>(`/perencanaan/tp?mapel_id=${mapel.id}`);
+                    const tpData = (Array.isArray(resTP.data) ? resTP.data : []) || [];
+                    
+                    // Ekstrak fase dari TP
+                    tpData.forEach((tp: any) => {
+                        if (tp.fase && !mapel.phases.includes(tp.fase)) {
+                            mapel.phases.push(tp.fase);
+                        }
+                    });
+                    
+                    // Sort phases
+                    mapel.phases.sort();
+                } catch (err) {
+                    // Jika error fetch TP, lanjut ke mapel berikutnya
+                    console.warn(`Gagal fetch TP untuk mapel ${mapel.nama}:`, err);
                 }
-            });
+            }
 
             setSubjects(uniqueMapels);
         } catch (error) {

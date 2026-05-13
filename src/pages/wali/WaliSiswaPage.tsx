@@ -7,7 +7,8 @@ import {
     ShieldAlert, 
     Eye,
     Filter,
-    User
+    User,
+    ClipboardCheck
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CheckCircle2, AlertTriangle, ListFilter } from 'lucide-react';
 import { DataTable } from '@/components/shared/DataTable';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Tooltip,
     TooltipContent,
@@ -47,6 +49,13 @@ export default function WaliSiswaPage() {
     const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         master_pelanggaran_id: '',
+        tanggal: new Date().toISOString().split('T')[0],
+        catatan: ''
+    });
+
+    const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+    const [attendanceData, setAttendanceData] = useState({
+        status: 'Izin',
         tanggal: new Date().toISOString().split('T')[0],
         catatan: ''
     });
@@ -99,6 +108,33 @@ export default function WaliSiswaPage() {
         } catch (e) {
             console.error(e);
             showToast.error('Gagal mencatat pelanggaran');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleAttendance = (student: any) => {
+        setReportingStudent(student);
+        setIsAttendanceModalOpen(true);
+        setAttendanceData({
+            status: 'Izin',
+            tanggal: new Date().toISOString().split('T')[0],
+            catatan: ''
+        });
+    };
+
+    const submitAttendance = async () => {
+        setSaving(true);
+        try {
+            await api.post('/wali-kelas/attendance', {
+                peserta_didik_id: reportingStudent.id,
+                ...attendanceData
+            });
+            showToast.success('Absensi berhasil diperbarui');
+            setIsAttendanceModalOpen(false);
+        } catch (e) {
+            console.error(e);
+            showToast.error('Gagal memperbarui absensi');
         } finally {
             setSaving(false);
         }
@@ -253,6 +289,22 @@ export default function WaliSiswaPage() {
                                                 variant="ghost" 
                                                 size="sm" 
                                                 className="h-8 rounded-lg hover:bg-white/5"
+                                                onClick={() => handleAttendance(student)}
+                                            >
+                                                <ClipboardCheck className="w-4 h-4 text-emerald-400" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="bg-zinc-900 border border-white/10 text-white font-bold py-1.5 px-3 rounded-xl shadow-2xl">
+                                            Catat Izin / Sakit
+                                        </TooltipContent>
+                                    </Tooltip>
+
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                className="h-8 rounded-lg hover:bg-white/5"
                                                 onClick={() => handleReportViolation(student)}
                                             >
                                                 <ShieldAlert className="w-4 h-4 text-rose-400" />
@@ -327,6 +379,21 @@ export default function WaliSiswaPage() {
                                         <Button 
                                             variant="outline" 
                                             className="rounded-xl border-white/5 bg-white/3 hover:bg-white/10 px-3"
+                                            onClick={() => handleAttendance(student)}
+                                        >
+                                            <ClipboardCheck className="w-4 h-4 text-emerald-400" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="bg-zinc-900 border border-white/10 text-white font-bold py-1.5 px-3 rounded-xl shadow-2xl">
+                                        Catat Absensi
+                                    </TooltipContent>
+                                </Tooltip>
+
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button 
+                                            variant="outline" 
+                                            className="rounded-xl border-white/5 bg-white/3 hover:bg-white/10 px-3"
                                             onClick={() => handleReportViolation(student)}
                                         >
                                             <ShieldAlert className="w-4 h-4 text-rose-400" />
@@ -392,6 +459,63 @@ export default function WaliSiswaPage() {
                             placeholder="Jelaskan detail kejadian..."
                             value={formData.catatan}
                             onChange={(val) => setFormData({...formData, catatan: val})}
+                            isTextArea
+                        />
+                    </div>
+                </Modal>
+            )}
+            {/* Attendance Modal */}
+            {isAttendanceModalOpen && reportingStudent && (
+                <Modal
+                    isOpen={isAttendanceModalOpen}
+                    title="Catat Absensi Manual"
+                    onClose={() => setIsAttendanceModalOpen(false)}
+                    onSubmit={submitAttendance}
+                    submitLabel="Simpan Absensi"
+                    saving={saving}
+                >
+                    <div className="space-y-6">
+                        <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                                <ClipboardCheck className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-emerald-500/50 uppercase tracking-widest">Siswa</p>
+                                <h4 className="font-black text-foreground uppercase">{reportingStudent.nama}</h4>
+                                <p className="text-[10px] font-bold text-muted-foreground">NIS: {reportingStudent.nis}</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Status Absensi</label>
+                                <Select value={attendanceData.status} onValueChange={(val) => setAttendanceData({ ...attendanceData, status: val })}>
+                                    <SelectTrigger className="h-12 rounded-xl bg-white/5 border-white/10">
+                                        <SelectValue placeholder="Pilih Status" />
+                                    </SelectTrigger>
+                                    <SelectContent position="popper" className="rounded-xl border-white/10 bg-zinc-900 shadow-2xl z-[10001]">
+                                        <SelectItem value="Izin" className="rounded-lg">Izin</SelectItem>
+                                        <SelectItem value="Sakit" className="rounded-lg">Sakit</SelectItem>
+                                        <SelectItem value="Alpa" className="rounded-lg">Alpa (Tanpa Keterangan)</SelectItem>
+                                        <SelectItem value="Valid" className="rounded-lg text-emerald-400">Hadir (Manual)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <FormField 
+                                id="att_tanggal" 
+                                label="Tanggal Absensi" 
+                                type="date"
+                                value={attendanceData.tanggal}
+                                onChange={(val) => setAttendanceData({...attendanceData, tanggal: val})}
+                            />
+                        </div>
+
+                        <FormField 
+                            id="att_catatan" 
+                            label="Catatan / Alasan" 
+                            placeholder="Contoh: Surat dokter terlampir..."
+                            value={attendanceData.catatan}
+                            onChange={(val) => setAttendanceData({...attendanceData, catatan: val})}
                             isTextArea
                         />
                     </div>

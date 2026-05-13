@@ -40,6 +40,7 @@ interface Sekolah {
   kode_pos: string;
   lintang: number;
   bujur: number;
+  radius_presensi: number;
 }
 
 interface SekolahStats {
@@ -51,7 +52,7 @@ interface SekolahStats {
 const EMPTY_FORM = {
   nama: '', npsn: '', status: 'Negeri' as 'Negeri' | 'Swasta',
   alamat: '', provinsi: '', kabupaten: '', kecamatan: '', desa: '', kode_pos: '',
-  lintang: 0, bujur: 0
+  lintang: 0, bujur: 0, radius_presensi: 100
 };
 
 // ─── Stats Card Component ──────────────────────────────────────────────────
@@ -389,6 +390,9 @@ export default function SekolahPage() {
               <div className="grid grid-cols-2 gap-6">
                 <FormField id="lintang" label="Latitude (Garis Lintang)" type="number" placeholder="-6.123456" value={String(form.lintang)} onChange={v => setForm(f => ({ ...f, lintang: Number(v) }))} />
                 <FormField id="bujur" label="Longitude (Garis Bujur)" type="number" placeholder="106.123456" value={String(form.bujur)} onChange={v => setForm(f => ({ ...f, bujur: Number(v) }))} />
+              </div>
+              <div className="pt-2">
+                <FormField id="radius" label="Radius Presensi (Meter)" type="number" placeholder="100" value={String(form.radius_presensi)} onChange={v => setForm(f => ({ ...f, radius_presensi: Number(v) }))} />
               </div>
               <p className="text-[10px] text-muted-foreground italic">Gunakan koordinat dari Google Maps untuk akurasi lokasi yang lebih baik.</p>
             </div>

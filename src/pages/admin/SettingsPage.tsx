@@ -35,9 +35,23 @@ import { PageHero } from '@/components/shared/PageHero';
 import { showToast } from '@/lib/toast-utils';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+
+// Fix Leaflet marker icon issue with build tools
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+const DefaultIcon = L.icon({
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-type Tab = 'profile' | 'security' | 'school' | 'notifications';
+type Tab = 'profile' | 'security' | 'school' | 'attendance' | 'notifications';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function getPasswordStrength(pwd: string): { score: number; label: string; color: string } {
@@ -54,6 +68,16 @@ function getPasswordStrength(pwd: string): { score: number; label: string; color
     { score: 4, label: 'Kuat', color: '#22c55e' },
   ];
   return map[score - 1] ?? { score: 0, label: '', color: '' };
+}
+
+function LocationMarker({ position, setPosition }: { position: [number, number], setPosition: (p: [number, number]) => void }) {
+  useMapEvents({
+    click(e) {
+      setPosition([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+
+  return position ? <Marker position={position} /> : null;
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -457,18 +481,6 @@ function SchoolTab({ user }: { user: any }) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const fetchSekolah = async () => {
-    if (!user?.sekolah_id) return;
-    try {
-      const res = await api.get<{ data: any }>(`/sekolah/${user.sekolah_id}`);
-      setSekolah(res.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchSekolah();
   }, [user]);
@@ -476,12 +488,37 @@ function SchoolTab({ user }: { user: any }) {
   const handleUpdate = async () => {
     setSaving(true);
     try {
-      await api.put(`/sekolah/${user.sekolah_id}`, sekolah);
-      showToast.success('Profil sekolah berhasil diperbarui');
+      await Promise.all([
+        api.put(`/sekolah/${user.sekolah_id}`, sekolah),
+        api.put(`/absensi/settings`, attendanceSettings)
+      ]);
+      showToast.success('Konfigurasi sekolah berhasil diperbarui');
     } catch (e) {
-      showToast.error('Gagal memperbarui profil sekolah');
+      showToast.error('Gagal memperbarui konfigurasi');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAddHoliday = async () => {
+    if (!newHoliday.tanggal) return;
+    try {
+      await api.post('/absensi/holidays', newHoliday);
+      showToast.success('Hari libur berhasil ditambahkan');
+      setNewHoliday({ tanggal: '', keterangan: '' });
+      fetchSekolah();
+    } catch (e) {
+      showToast.error('Gagal menambah hari libur');
+    }
+  };
+
+  const handleDeleteHoliday = async (id: string) => {
+    try {
+      await api.delete(`/absensi/holidays/${id}`);
+      showToast.success('Hari libur dihapus');
+      fetchSekolah();
+    } catch (e) {
+      showToast.error('Gagal menghapus hari libur');
     }
   };
 
@@ -658,6 +695,56 @@ function SchoolTab({ user }: { user: any }) {
                 </div>
               </div>
             </div>
+
+            <div className="pt-4 border-t border-white/5">
+              <div className="flex items-center gap-2 mb-4">
+                <SmartphoneNfc className="w-3.5 h-3.5 text-primary" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-primary">Pengaturan Presensi (GPS)</p>
+              </div>
+              <div className="grid gap-6 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground pl-1">Latitude</Label>
+                  <Input type="number" value={sekolah?.lintang || ''} onChange={e => setSekolah({ ...sekolah, lintang: e.target.value })} placeholder="-6.123456" className="bg-white/5 border-white/10 h-12 rounded-2xl font-bold" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground pl-1">Longitude</Label>
+                  <Input type="number" value={sekolah?.bujur || ''} onChange={e => setSekolah({ ...sekolah, bujur: e.target.value })} placeholder="106.123456" className="bg-white/5 border-white/10 h-12 rounded-2xl font-bold" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground pl-1">Radius Aman (Meter)</Label>
+                  <Input type="number" value={sekolah?.radius_presensi || ''} onChange={e => setSekolah({ ...sekolah, radius_presensi: e.target.value })} placeholder="100" className="bg-white/5 border-white/10 h-12 rounded-2xl font-bold" />
+                </div>
+              </div>
+
+              {/* Map Picker */}
+              <div className="mt-4 rounded-3xl overflow-hidden border border-white/10 bg-black/40 h-[300px] relative">
+                <MapContainer 
+                  center={[Number(sekolah?.lintang) || -6.200000, Number(sekolah?.bujur) || 106.816666]} 
+                  zoom={15} 
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <LocationMarker 
+                    position={[Number(sekolah?.lintang) || -6.200000, Number(sekolah?.bujur) || 106.816666]} 
+                    setPosition={([lat, lng]) => setSekolah({ ...sekolah, lintang: lat, bujur: lng })} 
+                  />
+                </MapContainer>
+                <div className="absolute bottom-4 left-4 z-[1000] bg-zinc-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-xl pointer-events-none">
+                  <p className="text-[10px] font-bold text-white flex items-center gap-2">
+                    <MapPin className="w-3 h-3 text-primary" />
+                    Klik pada peta untuk menentukan lokasi sekolah
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-muted-foreground italic mt-3 pl-1 flex items-center gap-2">
+                <Info className="w-3 h-3" />
+                Siswa hanya dapat melakukan presensi jika berada dalam radius aman ini dari titik koordinat sekolah.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -671,6 +758,187 @@ function SchoolTab({ user }: { user: any }) {
           </Button>
         </div>
       </SectionCard>
+    </div>
+  );
+}
+
+function AttendanceTab() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [attendanceSettings, setAttendanceSettings] = useState<any>(null);
+  const [holidays, setHolidays] = useState<any[]>([]);
+  const [newHoliday, setNewHoliday] = useState({ tanggal: '', keterangan: '' });
+
+  const fetchData = async () => {
+    try {
+      const [settingsRes, holidaysRes] = await Promise.all([
+        api.get<any>(`/absensi/settings`),
+        api.get<any>(`/absensi/holidays`)
+      ]);
+      setAttendanceSettings(settingsRes.data);
+      setHolidays(holidaysRes.data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleUpdate = async () => {
+    setSaving(true);
+    try {
+      await api.put(`/absensi/settings`, attendanceSettings);
+      showToast.success('Konfigurasi presensi berhasil diperbarui');
+    } catch (e) {
+      showToast.error('Gagal memperbarui konfigurasi');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddHoliday = async () => {
+    if (!newHoliday.tanggal) return;
+    try {
+      await api.post('/absensi/holidays', newHoliday);
+      showToast.success('Hari libur berhasil ditambahkan');
+      setNewHoliday({ tanggal: '', keterangan: '' });
+      fetchData();
+    } catch (e) {
+      showToast.error('Gagal menambah hari libur');
+    }
+  };
+
+  const handleDeleteHoliday = async (id: string) => {
+    try {
+      await api.delete(`/absensi/holidays/${id}`);
+      showToast.success('Hari libur dihapus');
+      fetchData();
+    } catch (e) {
+      showToast.error('Gagal menghapus hari libur');
+    }
+  };
+
+  if (loading) return <div className="p-20 flex justify-center"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <SectionCard title="Jam Operasional & Hari Kerja" description="Atur jadwal presensi harian siswa" icon={Clock}>
+        <div className="space-y-6">
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="space-y-4 p-5 rounded-2xl bg-white/[0.02] border border-white/5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary">Jadwal Masuk</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Mulai Boleh Absen</Label>
+                  <Input type="time" value={attendanceSettings?.jam_masuk_mulai || ''} onChange={e => setAttendanceSettings({ ...attendanceSettings, jam_masuk_mulai: e.target.value })} className="bg-zinc-900 border-white/10" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Batas Akhir (Lambat)</Label>
+                  <Input type="time" value={attendanceSettings?.jam_masuk_akhir || ''} onChange={e => setAttendanceSettings({ ...attendanceSettings, jam_masuk_akhir: e.target.value })} className="bg-zinc-900 border-white/10" />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-4 p-5 rounded-2xl bg-white/[0.02] border border-white/5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary">Jadwal Pulang</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Mulai Boleh Pulang</Label>
+                  <Input type="time" value={attendanceSettings?.jam_pulang_mulai || ''} onChange={e => setAttendanceSettings({ ...attendanceSettings, jam_pulang_mulai: e.target.value })} className="bg-zinc-900 border-white/10" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Batas Akhir Pulang</Label>
+                  <Input type="time" value={attendanceSettings?.jam_pulang_akhir || ''} onChange={e => setAttendanceSettings({ ...attendanceSettings, jam_pulang_akhir: e.target.value })} className="bg-zinc-900 border-white/10" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground pl-1">Hari Kerja Efektif</Label>
+            <div className="flex flex-wrap gap-2">
+              {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'].map(day => {
+                const days = Array.isArray(attendanceSettings?.hari_kerja) ? attendanceSettings.hari_kerja : JSON.parse(attendanceSettings?.hari_kerja || '[]');
+                const isSelected = days.includes(day);
+                return (
+                  <button
+                    key={day}
+                    onClick={() => {
+                      const newDays = isSelected ? days.filter((d: string) => d !== day) : [...days, day];
+                      setAttendanceSettings({ ...attendanceSettings, hari_kerja: newDays });
+                    }}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                      isSelected ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'bg-white/5 text-muted-foreground border border-white/5 hover:bg-white/10'
+                    }`}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Kalender Hari Libur" description="Tentukan tanggal libur khusus untuk instansi Anda" icon={Sparkles}>
+        <div className="space-y-6">
+          <div className="flex gap-4 items-end bg-white/[0.02] p-5 rounded-2xl border border-white/5">
+            <div className="grid gap-4 flex-1 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Tanggal Libur</Label>
+                <Input type="date" value={newHoliday.tanggal} onChange={e => setNewHoliday({ ...newHoliday, tanggal: e.target.value })} className="bg-zinc-900 border-white/10" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Keterangan</Label>
+                <Input value={newHoliday.keterangan} onChange={e => setNewHoliday({ ...newHoliday, keterangan: e.target.value })} placeholder="Misal: Libur Idul Fitri" className="bg-zinc-900 border-white/10" />
+              </div>
+            </div>
+            <Button onClick={handleAddHoliday} variant="outline" className="h-10 border-primary/30 text-primary hover:bg-primary/10 rounded-xl">
+              Tambah
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground pl-1">Daftar Libur Mendatang</Label>
+            <div className="grid gap-3">
+              {holidays.length === 0 ? (
+                <p className="text-center py-8 text-xs text-muted-foreground italic border border-dashed border-white/5 rounded-2xl">Belum ada hari libur yang ditambahkan.</p>
+              ) : (
+                holidays.map((h: any) => (
+                  <div key={h.id} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/5 group">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex flex-col items-center justify-center border border-primary/20">
+                        <span className="text-[8px] font-black text-primary">{format(new Date(h.tanggal), 'MMM')}</span>
+                        <span className="text-sm font-black text-white leading-none">{format(new Date(h.tanggal), 'dd')}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-white">{h.keterangan || 'Tanpa Keterangan'}</p>
+                        <p className="text-[10px] text-muted-foreground">{format(new Date(h.tanggal), 'EEEE, dd MMMM yyyy', { locale: id })}</p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteHoliday(h.id)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-400 hover:bg-rose-400/10">
+                      Hapus
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      <div className="mt-8 flex justify-end">
+        <Button
+          onClick={handleUpdate}
+          disabled={saving}
+          className="gap-2 min-w-[200px] h-12 rounded-2xl font-bold uppercase tracking-tight shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90"
+        >
+          {saving ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <><Save className="w-4 h-4" /> Simpan Konfigurasi</>}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -752,6 +1020,7 @@ export default function SettingsPage() {
     { key: 'profile', label: 'Profil Akun', icon: User },
     { key: 'security', label: 'Keamanan', icon: Shield },
     { key: 'school', label: 'Profil Sekolah', icon: Building2, adminOnly: true },
+    { key: 'attendance', label: 'Presensi & Jadwal', icon: Clock, adminOnly: true },
     { key: 'notifications', label: 'Notifikasi', icon: Bell },
   ];
 
@@ -805,10 +1074,11 @@ export default function SettingsPage() {
 
         {/* Content Area */}
         <div className="flex-1 min-w-0">
-          {activeTab === 'profile' && <ProfileTab />}
-          {activeTab === 'security' && <SecurityTab />}
-          {activeTab === 'school' && <SchoolTab user={user} />}
-          {activeTab === 'notifications' && <NotificationsTab />}
+            {activeTab === 'profile' && <ProfileTab />}
+            {activeTab === 'security' && <SecurityTab />}
+            {activeTab === 'school' && <SchoolTab user={user} />}
+            {activeTab === 'attendance' && <AttendanceTab />}
+            {activeTab === 'notifications' && <NotificationsTab />}
         </div>
       </div>
     </div>

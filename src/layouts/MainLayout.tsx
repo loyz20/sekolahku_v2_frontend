@@ -145,7 +145,7 @@ const ROUTE_LABELS: Record<string, string> = {
   'absensi-kelas': 'Absensi Kelas',
   'jadwal-siswa':  'Jadwal Pelajaran',
   'nilai-siswa':   'Nilai',
-  kehadiran:       'Kehadiran',
+  absensi:         'Absensi',
   notifications:   'Notifikasi',
 }
 

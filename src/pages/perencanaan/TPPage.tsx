@@ -78,23 +78,36 @@ export default function TPPage() {
 
     const fetchMapel = async () => {
         try {
-            // Fetch from pembelajaran to get only subjects taught by the teacher
-            const res = await api.get<any>('/pembelajaran?limit=100');
-            const items = res.data.items || [];
+            // Fetch pembelajaran untuk daftar mapel
+            const resMapel = await api.get<any>('/pembelajaran?limit=100');
+            const items = resMapel.data.items || [];
             
-            // Extract unique subjects
+            // Extract unique subjects from pembelajaran
             const uniqueMapels = Array.from(new Map(items.map((item: any) => [
                 item.mata_pelajaran_id, 
                 { id: item.mata_pelajaran_id, nama: item.mata_pelajaran_nama, phases: [] as string[] }
             ])).values()) as { id: string, nama: string, phases: string[] }[];
 
-            // Add available phases for each mapel
-            items.forEach((item: any) => {
-                const mapel = uniqueMapels.find(m => m.id === item.mata_pelajaran_id);
-                if (mapel && item.fase && !mapel.phases.includes(item.fase)) {
-                    mapel.phases.push(item.fase);
+            // Fetch CP untuk setiap mapel untuk mendapatkan fase
+            for (const mapel of uniqueMapels) {
+                try {
+                    const resCP = await api.get<any>(`/perencanaan/cp?mapel_id=${mapel.id}`);
+                    const cpData = (Array.isArray(resCP.data) ? resCP.data : []) || [];
+                    
+                    // Ekstrak fase dari CP
+                    cpData.forEach((cp: any) => {
+                        if (cp.fase && !mapel.phases.includes(cp.fase)) {
+                            mapel.phases.push(cp.fase);
+                        }
+                    });
+                    
+                    // Sort phases
+                    mapel.phases.sort();
+                } catch (err) {
+                    // Jika error fetch CP, lanjut ke mapel berikutnya
+                    console.warn(`Gagal fetch CP untuk mapel ${mapel.nama}:`, err);
                 }
-            });
+            }
 
             setMapels(uniqueMapels);
         } catch (error) {

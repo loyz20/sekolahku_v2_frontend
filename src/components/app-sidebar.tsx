@@ -124,7 +124,7 @@ const GURU_KESISWAAN: MenuItem[] = [
 const WALI_KELAS_ITEMS: MenuItem[] = [
   { title: 'Dashboard Wali', url: '/wali-kelas/dashboard', icon: LayoutDashboard },
   { title: 'Siswa Kelas', url: '/wali-kelas/siswa', icon: Users },
-  { title: 'Rekap Presensi', url: '/wali-kelas/presensi', icon: ClipboardCheck },
+  { title: 'Rekap Absensi', url: '/wali-kelas/absensi', icon: ClipboardCheck },
 ]
 
 const SISWA_ITEMS: MenuItem[] = [

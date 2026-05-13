@@ -37,7 +37,7 @@ import PengumumanPage from '@/pages/admin/PengumumanPage';
 import NotificationPage from '@/pages/core/NotificationPage';
 import WaliDashboardPage from '@/pages/wali/WaliDashboardPage';
 import WaliSiswaPage from '@/pages/wali/WaliSiswaPage';
-import WaliPresensiPage from '@/pages/wali/WaliPresensiPage';
+import WaliAbsensiPage from '@/pages/wali/WaliPresensiPage';
 import TPPage from '@/pages/perencanaan/TPPage';
 import ATPPage from '@/pages/perencanaan/ATPPage';
 import ModulAjarPage from '@/pages/perencanaan/ModulAjarPage';
@@ -111,7 +111,7 @@ function App() {
               <Route path="/notifications" element={<NotificationPage />} />
               <Route path="/wali-kelas/dashboard" element={<WaliDashboardPage />} />
               <Route path="/wali-kelas/siswa" element={<WaliSiswaPage />} />
-              <Route path="/wali-kelas/presensi" element={<WaliPresensiPage />} />
+              <Route path="/wali-kelas/absensi" element={<WaliAbsensiPage />} />
               <Route path="/perencanaan-tp" element={<TPPage />} />
               <Route path="/perencanaan-atp" element={<ATPPage />} />
               <Route path="/perencanaan-modul" element={<ModulAjarPage />} />

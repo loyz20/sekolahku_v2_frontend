@@ -8,8 +8,11 @@ import {
     ShieldAlert,
     ChevronRight,
     TrendingUp,
-    Cake,
-    MessageSquare
+    MessageSquare,
+    AlertCircle,
+    CheckCircle2,
+    Plus,
+    Cake
 } from 'lucide-react';
 import {
     BarChart,
@@ -27,6 +30,7 @@ import { FormField } from '@/components/shared/FormField';
 import { showToast } from '@/lib/toast-utils';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function WaliDashboardPage() {
     const [stats, setStats] = useState<any>(null);
@@ -35,17 +39,28 @@ export default function WaliDashboardPage() {
     const [broadcastMessage, setBroadcastMessage] = useState('');
     const [sending, setSending] = useState(false);
 
+    // Attendance State
+    const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+    const [selectedStudent, setSelectedStudent] = useState<any>(null);
+    const [attendanceForm, setAttendanceForm] = useState({
+        status: 'Izin',
+        tanggal: new Date().toISOString().split('T')[0],
+        catatan: ''
+    });
+
+    const fetchStats = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get<{ data: any }>('/wali-kelas/dashboard');
+            setStats(res.data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const res = await api.get<{ data: any }>('/wali-kelas/dashboard');
-                setStats(res.data);
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchStats();
     }, []);
 
@@ -60,6 +75,34 @@ export default function WaliDashboardPage() {
         } catch (e) {
             console.error(e);
             showToast.error('Gagal mengirim broadcast');
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const handleAttendance = (student: any) => {
+        setSelectedStudent(student);
+        setIsAttendanceModalOpen(true);
+        setAttendanceForm({
+            status: 'Izin',
+            tanggal: new Date().toISOString().split('T')[0],
+            catatan: ''
+        });
+    };
+
+    const submitAttendance = async () => {
+        setSending(true);
+        try {
+            await api.post('/wali-kelas/attendance', {
+                peserta_didik_id: selectedStudent.id,
+                ...attendanceForm
+            });
+            showToast.success('Absensi berhasil diperbarui');
+            setIsAttendanceModalOpen(false);
+            fetchStats(); // Refresh dashboard
+        } catch (e) {
+            console.error(e);
+            showToast.error('Gagal memperbarui absensi');
         } finally {
             setSending(false);
         }
@@ -94,7 +137,7 @@ export default function WaliDashboardPage() {
                     { label: 'Total Siswa', value: stats.total_students, icon: Users, color: 'text-blue-400', bg: 'bg-blue-400/10' },
                     { label: 'Siswa Laki-laki', value: stats.gender_stats.L, icon: Users, color: 'text-sky-400', bg: 'bg-sky-400/10' },
                     { label: 'Siswa Perempuan', value: stats.gender_stats.P, icon: Users, color: 'text-pink-400', bg: 'bg-pink-500/10' },
-                    { label: 'Kehadiran Hari Ini', value: `${((stats.attendance_today.Hadir / stats.total_students) * 100).toFixed(0)}%`, icon: ClipboardCheck, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+                    { label: 'Absensi Hari Ini', value: `${((stats.attendance_today.Hadir / stats.total_students) * 100).toFixed(0)}%`, icon: ClipboardCheck, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
                 ].map((stat, i) => (
                     <div key={i} className="p-5 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 bg-zinc-900/40 backdrop-blur-md shadow-2xl hover:border-white/10 transition-all group">
                         <div className={`w-12 h-12 rounded-2xl ${stat.bg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
@@ -111,7 +154,7 @@ export default function WaliDashboardPage() {
                 <div className="lg:col-span-2 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-white/5 bg-zinc-900/40 backdrop-blur-md shadow-2xl">
                     <div className="flex items-center justify-between mb-8">
                         <div>
-                            <h3 className="text-lg font-black uppercase tracking-tight text-white">Statistik Kehadiran Hari Ini</h3>
+                            <h3 className="text-lg font-black uppercase tracking-tight text-white">Statistik Absensi Hari Ini</h3>
                             <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-1">Distribusi status absensi siswa</p>
                         </div>
                         <TrendingUp className="w-6 h-6 text-emerald-400 opacity-50" />
@@ -168,6 +211,40 @@ export default function WaliDashboardPage() {
                                 <p className="text-[9px] text-muted-foreground uppercase font-medium">Orang Tua/Wali</p>
                             </div>
                         </Button>
+                    </div>
+
+                    {/* Unrecorded Students Mini List */}
+                    <div className="mt-8 pt-8 border-t border-white/5">
+                        <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Belum Absen Hari Ini</h4>
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[8px] font-black uppercase tracking-widest">
+                                {stats.unrecorded_today.length} Siswa
+                            </span>
+                        </div>
+                        <div className="space-y-2 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+                            {stats.unrecorded_today.length === 0 ? (
+                                <p className="text-[10px] text-muted-foreground italic text-center py-4 uppercase font-bold opacity-50 tracking-widest">Semua siswa sudah absen</p>
+                            ) : (
+                                stats.unrecorded_today.map((s: any) => (
+                                    <div key={s.id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5 hover:border-emerald-500/30 transition-all group">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-lg bg-zinc-900 border border-white/5 flex items-center justify-center text-[10px] font-bold text-muted-foreground group-hover:text-emerald-400">
+                                                {s.nama.charAt(0)}
+                                            </div>
+                                            <span className="text-[11px] font-bold text-white truncate max-w-[120px] uppercase">{s.nama}</span>
+                                        </div>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-7 w-7 p-0 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-400"
+                                            onClick={() => handleAttendance(s)}
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -269,6 +346,64 @@ export default function WaliDashboardPage() {
                     />
                 </div>
             </Modal>
+
+            {/* Attendance Modal */}
+            {isAttendanceModalOpen && selectedStudent && (
+                <Modal
+                    isOpen={isAttendanceModalOpen}
+                    title="Catat Absensi Manual"
+                    onClose={() => setIsAttendanceModalOpen(false)}
+                    onSubmit={submitAttendance}
+                    submitLabel="Simpan Absensi"
+                    saving={sending}
+                >
+                    <div className="space-y-6">
+                        <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                                <ClipboardCheck className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-emerald-500/50 uppercase tracking-widest">Siswa</p>
+                                <h4 className="font-black text-foreground uppercase">{selectedStudent.nama}</h4>
+                                <p className="text-[10px] font-bold text-muted-foreground">NIS: {selectedStudent.nis}</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Status Absensi</label>
+                                <Select value={attendanceForm.status} onValueChange={(val) => setAttendanceForm({ ...attendanceForm, status: val })}>
+                                    <SelectTrigger className="h-12 rounded-xl bg-white/5 border-white/10">
+                                        <SelectValue placeholder="Pilih Status" />
+                                    </SelectTrigger>
+                                    <SelectContent position="popper" className="rounded-xl border-white/10 bg-zinc-900 shadow-2xl z-[10001]">
+                                        <SelectItem value="Izin" className="rounded-lg">Izin</SelectItem>
+                                        <SelectItem value="Sakit" className="rounded-lg">Sakit</SelectItem>
+                                        <SelectItem value="Alpa" className="rounded-lg">Alpa (Tanpa Keterangan)</SelectItem>
+                                        <SelectItem value="Valid" className="rounded-lg text-emerald-400">Hadir (Manual)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <FormField 
+                                id="att_tanggal" 
+                                label="Tanggal Absensi" 
+                                type="date"
+                                value={attendanceForm.tanggal}
+                                onChange={(val) => setAttendanceForm({...attendanceForm, tanggal: val})}
+                            />
+                        </div>
+
+                        <FormField 
+                            id="att_catatan" 
+                            label="Catatan / Alasan" 
+                            placeholder="Contoh: Surat dokter terlampir..."
+                            value={attendanceForm.catatan}
+                            onChange={(val) => setAttendanceForm({...attendanceForm, catatan: val})}
+                            isTextArea
+                        />
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 }
